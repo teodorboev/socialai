@@ -559,7 +559,7 @@ model FeatureFlag {
 
 model EscalationRule {
   id              String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  organizationId  String?       @map("organization_id")
+  organizationId  String?       @map("organization_id") @db.Uuid
   organization    Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   name            String
   triggerType     String        @map("trigger_type")
