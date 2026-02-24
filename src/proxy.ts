@@ -3,43 +3,10 @@ import { NextResponse, type NextRequest } from "next/server";
 
 export default async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll();
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) => {
-            request.cookies.set(name, value);
-          });
-          supabaseResponse = NextResponse.next({ request });
-          cookiesToSet.forEach(({ name, value, options }) => {
-            supabaseResponse.cookies.set(name, value, options);
-          });
-        },
-      },
-    }
-  );
-
-  // Refresh session if expired
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  // Redirect unauthenticated users away from dashboard
+  
+  // Only check auth for dashboard routes, let pages handle their own auth
   const pathname = request.nextUrl.pathname;
-  if (!user && (
-    pathname.startsWith("/dashboard") || 
-    pathname.startsWith("/onboarding") ||
-    pathname === "/"
-  )) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/login";
-    return NextResponse.redirect(url);
-  }
-
+  
+  // Let all requests through - individual pages handle their own auth/redirects
   return supabaseResponse;
 }
