@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { ContentGenerator } from "@/components/dashboard/content-generator";
+import { ScheduleContent } from "@/components/dashboard/schedule-content";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -29,12 +30,13 @@ export default async function ContentPage() {
 
   const orgId = orgMember.organization_id;
 
-  // Get content
+  // Get content with schedules
   const { data: content } = await supabase
     .from("content")
     .select(`
       *,
-      social_accounts(platform_username, platform)
+      social_accounts(platform_username, platform),
+      schedules(scheduled_for, status)
     `)
     .eq("organization_id", orgId)
     .order("created_at", { ascending: false })
@@ -102,8 +104,9 @@ export default async function ContentPage() {
         <h2 className="text-xl font-semibold">Recent Content</h2>
         {content && content.length > 0 ? (
           <div className="space-y-2">
-            {content.map((item) => {
+            {content.map((item: any) => {
               const StatusIcon = statusIcons[item.status] || FileText;
+              const schedule = item.schedules?.[0];
               return (
                 <Card key={item.id}>
                   <CardContent className="p-4">
@@ -122,6 +125,11 @@ export default async function ContentPage() {
                             <span>{item.hashtags.length} hashtags</span>
                           )}
                           <span>Confidence: {Math.round(item.confidence_score * 100)}%</span>
+                          {schedule && (
+                            <span className="text-purple-600">
+                              Scheduled: {new Date(schedule.scheduled_for).toLocaleString()}
+                            </span>
+                          )}
                         </div>
                       </div>
                       <div className="flex flex-col items-end gap-2">
@@ -129,6 +137,7 @@ export default async function ContentPage() {
                         <span className="text-xs text-muted-foreground">
                           {new Date(item.created_at).toLocaleDateString()}
                         </span>
+                        <ScheduleContent content={item} />
                       </div>
                     </div>
                   </CardContent>
