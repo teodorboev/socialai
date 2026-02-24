@@ -166,6 +166,8 @@ export default function BrandPage() {
         never: neverHashtags.split(",").map((s) => s.trim()).filter(Boolean),
         rotating: rotatingHashtags.split(",").map((s) => s.trim()).filter(Boolean),
       },
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
     };
 
     const { error } = await supabase.from("brand_configs").upsert(data, {

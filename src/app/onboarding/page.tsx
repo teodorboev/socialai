@@ -61,12 +61,15 @@ export default function OnboardingPage() {
 
     // Create organization
     const slug = orgName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+    const now = new Date().toISOString();
     
     const { data: org, error: orgError } = await supabase
       .from("organizations")
       .insert({
         name: orgName,
         slug: `${slug}-${Date.now()}`,
+        created_at: now,
+        updated_at: now,
       })
       .select()
       .single();
@@ -84,6 +87,7 @@ export default function OnboardingPage() {
         organization_id: org.id,
         user_id: user.id,
         role: "OWNER",
+        created_at: new Date().toISOString(),
       });
 
     if (memberError) {
