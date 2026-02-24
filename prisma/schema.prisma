@@ -1,0 +1,606 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+}
+
+// ============================================================
+// ORGANIZATIONS & USERS
+// ============================================================
+
+model Organization {
+  id                String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name              String
+  slug              String              @unique
+  plan              Plan                @default(STARTER)
+  stripeCustomerId  String?             @unique @map("stripe_customer_id")
+  stripeSubId       String?             @unique @map("stripe_subscription_id")
+  trialEndsAt       DateTime?           @map("trial_ends_at")
+  createdAt         DateTime            @default(now()) @map("created_at")
+  updatedAt         DateTime            @updatedAt @map("updated_at")
+
+  members           OrgMember[]
+  socialAccounts    SocialAccount[]
+  brandConfig       BrandConfig?
+  content           Content[]
+  schedules         Schedule[]
+  engagements       Engagement[]
+  analyticsSnapshots AnalyticsSnapshot[]
+  agentLogs         AgentLog[]
+  escalations       Escalation[]
+  contentPlans      ContentPlan[]
+  orgSettings       OrgSettings?
+  postingSchedules  PostingSchedule[]
+  escalationRules  EscalationRule[]
+
+  @@map("organizations")
+}
+
+enum Plan {
+  STARTER
+  GROWTH
+  PRO
+  ENTERPRISE
+  MANAGED_STANDARD
+  MANAGED_PREMIUM
+  WHITE_LABEL
+}
+
+model OrgMember {
+  id             String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String       @map("organization_id") @db.Uuid
+  userId         String       @map("user_id") @db.Uuid // Maps to Supabase auth.users
+  role           MemberRole   @default(MEMBER)
+  createdAt      DateTime     @default(now()) @map("created_at")
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, userId])
+  @@map("org_members")
+}
+
+enum MemberRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+// ============================================================
+// SOCIAL ACCOUNTS
+// ============================================================
+
+model SocialAccount {
+  id              String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId  String       @map("organization_id") @db.Uuid
+  platform        Platform
+  platformUserId  String       @map("platform_user_id")
+  platformUsername String?     @map("platform_username")
+  accessToken     String       @map("access_token")    // Encrypted at rest
+  refreshToken    String?      @map("refresh_token")    // Encrypted at rest
+  tokenExpiresAt  DateTime?    @map("token_expires_at")
+  scopes          String[]     @default([])
+  isActive        Boolean      @default(true) @map("is_active")
+  metadata        Json?                                   // Platform-specific data
+  createdAt       DateTime     @default(now()) @map("created_at")
+  updatedAt       DateTime     @updatedAt @map("updated_at")
+
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  content         Content[]
+  schedules       Schedule[]
+  engagements     Engagement[]
+  analyticsSnapshots AnalyticsSnapshot[]
+
+  @@unique([organizationId, platform, platformUserId])
+  @@map("social_accounts")
+}
+
+enum Platform {
+  INSTAGRAM
+  FACEBOOK
+  TIKTOK
+  TWITTER
+  LINKEDIN
+}
+
+// ============================================================
+// BRAND CONFIGURATION
+// ============================================================
+
+model BrandConfig {
+  id               String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId   String       @unique @map("organization_id") @db.Uuid
+  brandName        String       @map("brand_name")
+  industry         String?
+  targetAudience   Json?        @map("target_audience")    // { demographics, interests, pain_points }
+  voiceTone        Json         @map("voice_tone")          // { adjectives: [], examples: [], avoid: [] }
+  contentThemes    String[]     @default([]) @map("content_themes")
+  hashtagStrategy  Json?        @map("hashtag_strategy")    // { always: [], never: [], rotating: [] }
+  competitors      Json?                                      // [{ name, platform, handle }]
+  brandColors      Json?        @map("brand_colors")         // { primary, secondary, accent }
+  doNots           String[]     @default([]) @map("do_nots") // Things the AI should never say/do
+  samplePosts      Json?        @map("sample_posts")         // Examples of on-brand content
+  faqKnowledge     Json?        @map("faq_knowledge")        // For engagement agent
+  createdAt        DateTime     @default(now()) @map("created_at")
+  updatedAt        DateTime     @updatedAt @map("updated_at")
+
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@map("brand_configs")
+}
+
+// ============================================================
+// CONTENT
+// ============================================================
+
+model Content {
+  id               String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId   String          @map("organization_id") @db.Uuid
+  socialAccountId  String?         @map("social_account_id") @db.Uuid
+  platform         Platform
+  contentType      ContentType     @map("content_type")
+  status           ContentStatus   @default(DRAFT)
+  caption          String
+  hashtags         String[]        @default([])
+  mediaUrls        String[]        @default([]) @map("media_urls")   // Supabase Storage URLs
+  mediaType        MediaType?      @map("media_type")
+  altText          String?         @map("alt_text")
+  linkUrl          String?         @map("link_url")
+  platformPostId   String?         @map("platform_post_id")           // ID after publishing
+  confidenceScore  Float           @default(0) @map("confidence_score")
+  agentNotes       String?         @map("agent_notes")                // Why this content was created
+  rejectionReason  String?         @map("rejection_reason")
+  abTestGroup      String?         @map("ab_test_group")              // A/B test identifier
+  contentPlanId    String?         @map("content_plan_id") @db.Uuid
+  publishedAt      DateTime?       @map("published_at")
+  createdAt        DateTime        @default(now()) @map("created_at")
+  updatedAt        DateTime        @updatedAt @map("updated_at")
+
+  organization     Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  socialAccount    SocialAccount?  @relation(fields: [socialAccountId], references: [id])
+  contentPlan      ContentPlan?    @relation(fields: [contentPlanId], references: [id])
+  schedule         Schedule?
+  engagements      Engagement[]
+
+  @@index([organizationId, status])
+  @@index([organizationId, platform, createdAt])
+  @@map("content")
+}
+
+enum ContentType {
+  POST
+  STORY
+  REEL
+  CAROUSEL
+  THREAD
+  ARTICLE
+  POLL
+}
+
+enum ContentStatus {
+  DRAFT
+  PENDING_REVIEW
+  APPROVED
+  SCHEDULED
+  PUBLISHING
+  PUBLISHED
+  FAILED
+  REJECTED
+}
+
+enum MediaType {
+  IMAGE
+  VIDEO
+  CAROUSEL_IMAGES
+  CAROUSEL_MIXED
+  GIF
+}
+
+// ============================================================
+// SCHEDULES
+// ============================================================
+
+model Schedule {
+  id               String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId   String        @map("organization_id") @db.Uuid
+  contentId        String        @unique @map("content_id") @db.Uuid
+  socialAccountId  String        @map("social_account_id") @db.Uuid
+  scheduledFor     DateTime      @map("scheduled_for")
+  publishedAt      DateTime?     @map("published_at")
+  status           ScheduleStatus @default(PENDING)
+  retryCount       Int           @default(0) @map("retry_count")
+  lastError        String?       @map("last_error")
+  createdAt        DateTime      @default(now()) @map("created_at")
+  updatedAt        DateTime      @updatedAt @map("updated_at")
+
+  organization     Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  content          Content       @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  socialAccount    SocialAccount @relation(fields: [socialAccountId], references: [id])
+
+  @@index([status, scheduledFor])
+  @@map("schedules")
+}
+
+enum ScheduleStatus {
+  PENDING
+  PUBLISHING
+  PUBLISHED
+  FAILED
+  CANCELLED
+}
+
+// ============================================================
+// ENGAGEMENT
+// ============================================================
+
+model Engagement {
+  id                 String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId     String             @map("organization_id") @db.Uuid
+  socialAccountId    String             @map("social_account_id") @db.Uuid
+  contentId          String?            @map("content_id") @db.Uuid
+  platform           Platform
+  engagementType     EngagementType     @map("engagement_type")
+  platformEngagementId String?          @map("platform_engagement_id")
+  authorName         String?            @map("author_name")
+  authorUsername     String?            @map("author_username")
+  authorProfileUrl   String?            @map("author_profile_url")
+  body               String?
+  sentiment          Sentiment?
+  aiResponse         String?            @map("ai_response")
+  aiResponseStatus   AIResponseStatus   @default(PENDING) @map("ai_response_status")
+  confidenceScore    Float?             @map("confidence_score")
+  isEscalated        Boolean            @default(false) @map("is_escalated")
+  respondedAt        DateTime?          @map("responded_at")
+  createdAt          DateTime           @default(now()) @map("created_at")
+  updatedAt          DateTime           @updatedAt @map("updated_at")
+
+  organization       Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  socialAccount      SocialAccount      @relation(fields: [socialAccountId], references: [id])
+  content            Content?           @relation(fields: [contentId], references: [id])
+
+  @@index([organizationId, aiResponseStatus])
+  @@index([organizationId, isEscalated])
+  @@map("engagements")
+}
+
+enum EngagementType {
+  COMMENT
+  DIRECT_MESSAGE
+  MENTION
+  REPLY
+  QUOTE
+}
+
+enum Sentiment {
+  POSITIVE
+  NEUTRAL
+  NEGATIVE
+  URGENT
+}
+
+enum AIResponseStatus {
+  PENDING
+  AUTO_RESPONDED
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
+  SKIPPED
+}
+
+// ============================================================
+// CONTENT PLANS (Strategy Agent Output)
+// ============================================================
+
+model ContentPlan {
+  id               String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId   String       @map("organization_id") @db.Uuid
+  title            String
+  periodStart      DateTime     @map("period_start")
+  periodEnd        DateTime     @map("period_end")
+  strategy         Json                                  // Full strategy document from AI
+  themes           String[]     @default([])
+  platformMix      Json         @map("platform_mix")     // { instagram: 40, tiktok: 30, ... }
+  postsPerWeek     Json         @map("posts_per_week")   // { instagram: 5, tiktok: 3, ... }
+  status           PlanStatus   @default(DRAFT)
+  createdAt        DateTime     @default(now()) @map("created_at")
+  updatedAt        DateTime     @updatedAt @map("updated_at")
+
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  content          Content[]
+
+  @@index([organizationId, periodStart])
+  @@map("content_plans")
+}
+
+enum PlanStatus {
+  DRAFT
+  ACTIVE
+  COMPLETED
+  ARCHIVED
+}
+
+// ============================================================
+// ANALYTICS
+// ============================================================
+
+model AnalyticsSnapshot {
+  id               String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId   String        @map("organization_id") @db.Uuid
+  socialAccountId  String        @map("social_account_id") @db.Uuid
+  platform         Platform
+  snapshotDate     DateTime      @map("snapshot_date") @db.Date
+  followers        Int?
+  followersChange  Int?          @map("followers_change")
+  impressions      Int?
+  reach            Int?
+  engagementRate   Float?        @map("engagement_rate")
+  clicks           Int?
+  shares           Int?
+  saves            Int?
+  topContent       Json?         @map("top_content")
+  rawData          Json?         @map("raw_data")
+  createdAt        DateTime      @default(now()) @map("created_at")
+
+  organization     Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  socialAccount    SocialAccount @relation(fields: [socialAccountId], references: [id])
+
+  @@unique([socialAccountId, snapshotDate])
+  @@index([organizationId, snapshotDate])
+  @@map("analytics_snapshots")
+}
+
+// ============================================================
+// AGENT LOGS (Full Audit Trail)
+// ============================================================
+
+model AgentLog {
+  id               String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId   String?      @map("organization_id") @db.Uuid
+  agentName        AgentName    @map("agent_name")
+  action           String
+  inputSummary     Json?        @map("input_summary")
+  outputSummary    Json?        @map("output_summary")
+  confidenceScore  Float?       @map("confidence_score")
+  durationMs       Int?         @map("duration_ms")
+  tokensUsed       Int?         @map("tokens_used")
+  costEstimate     Float?       @map("cost_estimate")    // Track AI costs per action
+  status           AgentLogStatus @default(SUCCESS)
+  errorMessage     String?      @map("error_message")
+  createdAt        DateTime     @default(now()) @map("created_at")
+
+  organization     Organization? @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId, agentName, createdAt])
+  @@index([agentName, createdAt])
+  @@map("agent_logs")
+}
+
+enum AgentName {
+  ORCHESTRATOR
+  STRATEGY
+  CONTENT_CREATOR
+  VISUAL
+  PUBLISHER
+  ENGAGEMENT
+  ANALYTICS
+  TREND_SCOUT
+  AB_TESTING
+}
+
+enum AgentLogStatus {
+  SUCCESS
+  FAILED
+  ESCALATED
+}
+
+// ============================================================
+// ESCALATIONS
+// ============================================================
+
+model Escalation {
+  id               String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId   String            @map("organization_id") @db.Uuid
+  agentName        AgentName         @map("agent_name")
+  reason           String
+  context          Json                                  // Full context for human reviewer
+  referenceType    String?           @map("reference_type")  // "content", "engagement", etc.
+  referenceId      String?           @map("reference_id") @db.Uuid
+  priority         EscalationPriority @default(MEDIUM)
+  status           EscalationStatus  @default(OPEN)
+  resolvedBy       String?           @map("resolved_by") @db.Uuid
+  resolution       String?
+  createdAt        DateTime          @default(now()) @map("created_at")
+  updatedAt        DateTime          @updatedAt @map("updated_at")
+
+  organization     Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, status, priority])
+  @@map("escalations")
+}
+
+enum EscalationPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum EscalationStatus {
+  OPEN
+  IN_REVIEW
+  RESOLVED
+  DISMISSED
+}
+
+// ============================================================
+// ORG SETTINGS (Configuration per organization)
+// ============================================================
+
+model OrgSettings {
+  id                          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId              String   @unique @map("organization_id") @db.Uuid
+  organization                Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Confidence thresholds
+  autoPublishThreshold        Float    @default(0.90) @map("auto_publish_threshold")
+  flagForReviewThreshold      Float    @default(0.75) @map("flag_for_review_threshold")
+  requireReviewThreshold      Float    @default(0.50) @map("require_review_threshold")
+
+  // AI configuration
+  defaultAiModel              String   @default("claude-sonnet-4-20250514") @map("default_ai_model")
+  aiTemperature               Float    @default(0.7) @map("ai_temperature")
+  aiMaxTokens                 Int      @default(4096) @map("ai_max_tokens")
+
+  // Engagement automation
+  autoEngagementEnabled       Boolean  @default(false) @map("auto_engagement_enabled")
+  engagementConfidenceMin     Float    @default(0.85) @map("engagement_confidence_min")
+  engagementResponseDelaySec  Int      @default(300) @map("engagement_response_delay_sec")
+
+  // Content limits
+  maxPostsPerDayPerPlatform   Int      @default(3) @map("max_posts_per_day_per_platform")
+  contentBufferDays           Int      @default(2) @map("content_buffer_days")
+
+  // General
+  timezone                    String   @default("UTC")
+  weeklyReportEnabled         Boolean  @default(true) @map("weekly_report_enabled")
+  weeklyReportDay             Int      @default(1) @map("weekly_report_day")
+
+  createdAt                   DateTime @default(now()) @map("created_at")
+  updatedAt                   DateTime @updatedAt @map("updated_at")
+
+  @@map("org_settings")
+}
+
+// ============================================================
+// PLATFORM CONFIG (System-wide platform settings)
+// ============================================================
+
+model PlatformConfig {
+  id                    String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  platform              Platform @unique
+  displayName           String   @map("display_name")
+  maxCaptionLength      Int      @map("max_caption_length")
+  maxHashtags           Int      @map("max_hashtags")
+  supportedContentTypes String[] @map("supported_content_types")
+  imageSpecs            Json     @map("image_specs")
+  rateLimit            Json     @map("rate_limit")
+  retryConfig          Json     @map("retry_config")
+  oauthScopes           String[]
+  guidelines            String   @db.Text
+  isEnabled             Boolean  @default(true) @map("is_enabled")
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  @@map("platform_configs")
+}
+
+// ============================================================
+// PROMPT TEMPLATES (AI prompts stored in DB)
+// ============================================================
+
+model PromptTemplate {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  agentName   AgentName
+  name        String
+  description String?
+  body        String    @db.Text
+  variables   String[]
+  version     Int       @default(1)
+  isActive    Boolean   @default(true) @map("is_active")
+  createdBy   String?   @map("created_by")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@unique([agentName, name, version])
+  @@map("prompt_templates")
+}
+
+// ============================================================
+// POSTING SCHEDULES
+// ============================================================
+
+model PostingSchedule {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId  String   @map("organization_id") @db.Uuid
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  platform        Platform
+  dayOfWeek       Int      @map("day_of_week")
+  timeUtc         String   @map("time_utc")
+  isEnabled       Boolean  @default(true) @map("is_enabled")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@unique([organizationId, platform, dayOfWeek, timeUtc])
+  @@map("posting_schedules")
+}
+
+// ============================================================
+// FEATURE FLAGS
+// ============================================================
+
+model FeatureFlag {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  key         String   @unique
+  name        String
+  description String?
+  isEnabled   Boolean  @default(false) @map("is_enabled")
+  planMinimum Plan?
+  metadata    Json?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("feature_flags")
+}
+
+// ============================================================
+// ESCALATION RULES
+// ============================================================
+
+model EscalationRule {
+  id              String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId  String?       @map("organization_id")
+  organization    Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name            String
+  triggerType     String        @map("trigger_type")
+  triggerValue    String        @map("trigger_value")
+  action          String
+  priority        EscalationPriority @default(MEDIUM)
+  isEnabled       Boolean       @default(true) @map("is_enabled")
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+
+  @@map("escalation_rules")
+}
+
+// ============================================================
+// EMAIL TEMPLATES
+// ============================================================
+
+model EmailTemplate {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  slug      String   @unique
+  subject   String
+  body      String   @db.Text
+  variables String[]
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("email_templates")
+}
+
+// ============================================================
+// SAFETY CONFIG
+// ============================================================
+
+model SafetyConfig {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  category  String   @unique
+  values    String[]
+  action    String
+  isEnabled Boolean  @default(true) @map("is_enabled")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("safety_configs")
+}

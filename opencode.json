@@ -1,28 +1,6 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  "provider": {
-    "anthropic": {
-      "model": "claude-sonnet-4-5"
-    }
-  },
-  "agent": {
-    "build": {
-      "model": "anthropic/claude-sonnet-4-5",
-      "description": "Primary builder agent for SocialAI platform development",
-      "tools": {
-        "skill": true
-      }
-    },
-    "plan": {
-      "model": "anthropic/claude-sonnet-4-5",
-      "description": "Planning agent — outlines approach before building",
-      "tools": {
-        "skill": true,
-        "bash": false,
-        "edit": false
-      }
-    }
-  },
+  
   "permission": {
     "bash": {
       "*": "ask",
