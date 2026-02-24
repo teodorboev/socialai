@@ -1,0 +1,78 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "anthropic": {
+      "model": "claude-sonnet-4-5"
+    }
+  },
+  "agent": {
+    "build": {
+      "model": "anthropic/claude-sonnet-4-5",
+      "description": "Primary builder agent for SocialAI platform development",
+      "tools": {
+        "skill": true
+      }
+    },
+    "plan": {
+      "model": "anthropic/claude-sonnet-4-5",
+      "description": "Planning agent — outlines approach before building",
+      "tools": {
+        "skill": true,
+        "bash": false,
+        "edit": false
+      }
+    }
+  },
+  "permission": {
+    "bash": {
+      "*": "ask",
+      "git status*": "allow",
+      "git diff*": "allow",
+      "git log*": "allow",
+      "git branch*": "allow",
+      "git checkout*": "allow",
+      "git add*": "allow",
+      "git commit*": "allow",
+      "git push*": "allow",
+      "git pull*": "allow",
+      "git stash*": "allow",
+      "git merge*": "ask",
+      "npx prisma generate*": "allow",
+      "npx prisma migrate*": "allow",
+      "npx prisma db push*": "allow",
+      "npx prisma studio*": "allow",
+      "npx prisma format*": "allow",
+      "npm install*": "allow",
+      "npm run*": "allow",
+      "npm exec*": "allow",
+      "npx*": "allow",
+      "node*": "allow",
+      "bun*": "allow",
+      "bunx*": "allow",
+      "cat*": "allow",
+      "ls*": "allow",
+      "find*": "allow",
+      "grep*": "allow",
+      "head*": "allow",
+      "tail*": "allow",
+      "wc*": "allow",
+      "mkdir*": "allow",
+      "cp*": "allow",
+      "mv*": "allow",
+      "touch*": "allow",
+      "echo*": "allow",
+      "curl*": "ask",
+      "rm -rf*": "deny",
+      "sudo*": "deny"
+    },
+    "edit": {
+      "*": "allow"
+    },
+    "read": {
+      "*": "allow"
+    }
+  },
+  "instructions": [
+    "CODING-INSTRUCTIONS.md"
+  ]
+}
