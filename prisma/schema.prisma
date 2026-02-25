@@ -47,6 +47,9 @@ model Organization {
   aiFeedback        AIFeedback[]
   aiPreferences     AIPreference[]
   aiExemplars       AIExemplar[]
+  
+  // Shared Memory
+  memories          Memory[]
 
   // Creative Director
   visualBrandIdentity VisualBrandIdentity?
@@ -1276,4 +1279,42 @@ model GeneratedVisual {
   @@index([organizationId, contentId])
   @@index([organizationId, type])
   @@map("generated_visuals")
+}
+
+// ============================================================
+// SHARED MEMORY (pgvector)
+// ============================================================
+
+model Memory {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId  String    @map("organization_id") @db.Uuid
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  
+  // Content - the memory text stored as vector
+  content         String    @db.Text
+  embedding       Unsupported("vector(1536)")? // OpenAI text-embedding-3-small: 1536 dimensions
+  
+  // Metadata for filtering
+  memoryType      String    @map("memory_type") // "content_created", "content_performance", etc.
+  agentSource     String    @map("agent_source") // Which agent created this memory
+  platform        String?   // Platform if relevant
+  contentId       String?   @map("content_id") @db.Uuid // Related content ID if applicable
+  
+  // Importance scoring
+  importance      Float     @default(0.5) // 0-1, higher = more important to recall
+  accessCount     Int       @default(0) @map("access_count") // How often this memory has been recalled
+  lastAccessedAt  DateTime? @map("last_accessed_at")
+  
+  // Lifecycle
+  expiresAt       DateTime? @map("expires_at") // Some memories are temporary (trends, time-sensitive)
+  isConsolidated  Boolean   @default(false) @map("is_consolidated") // Has been merged into a summary memory
+  consolidatedInto String?  @map("consolidated_into") @db.Uuid // ID of the summary memory this was merged into
+  
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+  
+  @@index([organizationId, memoryType])
+  @@index([organizationId, createdAt])
+  @@index([organizationId, importance])
+  @@map("memory")
 }
