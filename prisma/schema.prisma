@@ -34,6 +34,14 @@ model Organization {
   orgSettings       OrgSettings?
   postingSchedules  PostingSchedule[]
   escalationRules  EscalationRule[]
+  
+  // New relations
+  localeConfigs      LocaleConfig[]
+  listeningKeywords  ListeningKeyword[]
+  listeningMentions  ListeningMention[]
+  competitors        Competitor[]
+  influencerCandidates InfluencerCandidate[]
+  audienceProfiles   AudienceProfile[]
 
   @@map("organizations")
 }
@@ -611,4 +619,151 @@ model SafetyConfig {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("safety_configs")
+}
+
+// ============================================================
+// LOCALIZATION
+// ============================================================
+
+model LocaleConfig {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId   String   @map("organization_id") @db.Uuid
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  locale           String       // "en-GB", "pt-BR", "es-MX"
+  displayName      String       // "United Kingdom", "Brazil"
+  language         String
+  timezone         String
+  culturalNotes    String   @db.Text
+  forbiddenTopics  String[] @default([]) @map("forbidden_topics")
+  localHashtags    String[] @default([]) @map("local_hashtags")
+  toneAdjustment   String   @map("tone_adjustment")
+  currencySymbol   String   @default("$") @map("currency_symbol")
+  dateFormat       String   @default("MM/DD/YYYY") @map("date_format")
+  measurementSystem String  @default("imperial") @map("measurement_system")
+  isEnabled        Boolean  @default(true) @map("is_enabled")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  @@unique([organizationId, locale])
+  @@map("locale_configs")
+}
+
+// ============================================================
+// SOCIAL LISTENING
+// ============================================================
+
+model ListeningKeyword {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId  String   @map("organization_id") @db.Uuid
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  keyword         String
+  type            String   // "brand", "industry", "competitor", "hashtag"
+  isEnabled       Boolean  @default(true) @map("is_enabled")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@unique([organizationId, keyword])
+  @@map("listening_keywords")
+}
+
+model ListeningMention {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId  String   @map("organization_id") @db.Uuid
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  platform        String
+  author          String
+  authorHandle    String?  @map("author_handle")
+  body            String   @db.Text
+  sentiment       String?
+  reach           Int      @default(0)
+  url             String?
+  isUGC           Boolean  @default(false) @map("is_ugc")
+  isProcessed     Boolean  @default(false) @map("is_processed")
+  detectedAt      DateTime @default(now()) @map("detected_at")
+
+  @@index([organizationId, detectedAt])
+  @@index([organizationId, sentiment])
+  @@map("listening_mentions")
+}
+
+// ============================================================
+// COMPETITOR INTELLIGENCE
+// ============================================================
+
+model Competitor {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId  String   @map("organization_id") @db.Uuid
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name            String
+  industry        String?
+  website         String?
+  accounts        CompetitorAccount[]
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@unique([organizationId, name])
+  @@map("competitors")
+}
+
+model CompetitorAccount {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  competitorId    String   @map("competitor_id") @db.Uuid
+  competitor      Competitor @relation(fields: [competitorId], references: [id], onDelete: Cascade)
+  platform        Platform
+  handle          String
+  platformUserId  String?  @map("platform_user_id")
+  isActive        Boolean  @default(true) @map("is_active")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@unique([competitorId, platform])
+  @@map("competitor_accounts")
+}
+
+// ============================================================
+// INFLUENCER SCOUT
+// ============================================================
+
+model InfluencerCandidate {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId  String   @map("organization_id") @db.Uuid
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name            String
+  handle          String
+  platform        Platform
+  followers       Int
+  tier            String
+  authenticityScore Float  @default(0) @map("authenticity_score")
+  relevanceScore  Float   @default(0) @map("relevance_score")
+  overallFitScore Float   @default(0) @map("overall_fit_score")
+  metrics         Json?
+  redFlags        String[] @default([]) @map("red_flags")
+  relationship    String   @default("none")
+  outreachStatus  String   @default("identified") @map("outreach_status")
+  outreachMessage String?  @db.Text @map("outreach_message")
+  notes           String?  @db.Text
+  scannedAt       DateTime @default(now()) @map("scanned_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@unique([organizationId, handle, platform])
+  @@index([organizationId, overallFitScore])
+  @@map("influencer_candidates")
+}
+
+// ============================================================
+// AUDIENCE INTELLIGENCE
+// ============================================================
+
+model AudienceProfile {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId  String   @map("organization_id") @db.Uuid
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  personas        Json
+  platformBreakdown Json   @map("platform_breakdown")
+  optimalWindows  Json     @map("optimal_windows")
+  audienceShifts  Json?    @map("audience_shifts")
+  analyzedAt      DateTime @default(now()) @map("analyzed_at")
+  periodStart     DateTime @map("period_start")
+  periodEnd       DateTime @map("period_end")
+
+  @@index([organizationId, analyzedAt])
+  @@map("audience_profiles")
 }
