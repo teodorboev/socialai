@@ -267,6 +267,7 @@ export default function OnboardPage() {
       const response = await fetch("/api/onboarding/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({
           companyName: state.companyName,
           industry: state.industry,
