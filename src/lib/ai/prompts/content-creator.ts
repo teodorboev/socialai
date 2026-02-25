@@ -36,10 +36,26 @@ interface ContentCreatorInput {
     caption: string;
     createdAt: string;
   }>;
+  // DNA Profile context - from content-dna
+  dnaContext?: {
+    recommendedHooks: string[];
+    recommendedTopics: string[];
+    recommendedAngles: string[];
+    recommendedDays: number[];
+    recommendedHours: number[];
+    avoidHooks: string[];
+    avoidTopics: string[];
+    avoidAngles: string[];
+    stats: {
+      totalPosts: number;
+      hitRate: number;
+      avgEngagement: number;
+    };
+  };
 }
 
 export function buildContentCreatorPrompt(input: ContentCreatorInput): string {
-  const { platform, brandConfig, contentPlanContext, trendContext, previousTopPerformers, recentPosts } = input;
+  const { platform, brandConfig, contentPlanContext, trendContext, previousTopPerformers, recentPosts, dnaContext } = input;
 
   return `You are an expert social media content creator for ${brandConfig.brandName}.
 
@@ -105,6 +121,27 @@ ${recentPosts?.length ? `══════════════════�
 RECENT POSTS (avoid repeating similar content)
 ═══════════════════════════════════════════════════════════════
 ${recentPosts.map((p) => `- "${p.caption.slice(0, 80)}..." (${p.createdAt})`).join("\n")}` : ""}
+
+${dnaContext ? `═══════════════════════════════════════════════════════════════
+DNA PATTERNS (engineer content matching winning formulas)
+═══════════════════════════════════════════════════════════════
+Based on ${dnaContext.stats.totalPosts} posts analyzed:
+- Hit rate: ${(dnaContext.stats.hitRate * 100).toFixed(1)}%
+- Avg engagement: ${(dnaContext.stats.avgEngagement * 100).toFixed(1)}%
+
+WINNING COMBINATIONS (prioritize these):
+${dnaContext.recommendedHooks.length ? `- Hooks that work: ${dnaContext.recommendedHooks.join(", ")}` : ""}
+${dnaContext.recommendedTopics.length ? `- Topics that resonate: ${dnaContext.recommendedTopics.join(", ")}` : ""}
+${dnaContext.recommendedAngles.length ? `- Angles that engage: ${dnaContext.recommendedAngles.join(", ")}` : ""}
+
+AVOID (high fatigue - overused):
+${dnaContext.avoidHooks.length ? `- Hooks: ${dnaContext.avoidHooks.join(", ")}` : ""}
+${dnaContext.avoidTopics.length ? `- Topics: ${dnaContext.avoidTopics.join(", ")}` : ""}
+${dnaContext.avoidAngles.length ? `- Angles: ${dnaContext.avoidAngles.join(", ")}` : ""}
+
+BEST TIMES:
+${dnaContext.recommendedDays.length ? `- Days: ${dnaContext.recommendedDays.map(d => ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][d]).join(", ")}` : ""}
+${dnaContext.recommendedHours.length ? `- Hours: ${dnaContext.recommendedHours.join(", ")}` : ""}` : ""}
 
 ═══════════════════════════════════════════════════════════════
 INSTRUCTIONS
