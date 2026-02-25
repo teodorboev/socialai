@@ -26,6 +26,9 @@ import {
   Menu,
   LogOut,
   Sparkles,
+  Search,
+  Globe,
+  UserPlus,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -37,6 +40,10 @@ const navigation = [
   { name: "Analytics", href: "/dashboard/analytics", icon: BarChart3 },
   { name: "Accounts", href: "/dashboard/accounts", icon: Users },
   { name: "Brand", href: "/dashboard/brand", icon: Palette },
+  { name: "Competitors", href: "/dashboard/competitors", icon: Search },
+  { name: "Influencers", href: "/dashboard/influencers", icon: UserPlus },
+  { name: "Localization", href: "/dashboard/localization", icon: Globe },
+  { name: "Listening", href: "/dashboard/listening", icon: Search },
   { name: "Escalations", href: "/dashboard/escalations", icon: AlertTriangle },
   { name: "Settings", href: "/dashboard/settings", icon: Settings },
 ];
