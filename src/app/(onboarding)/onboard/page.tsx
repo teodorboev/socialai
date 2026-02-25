@@ -91,6 +91,17 @@ export default function OnboardPage() {
     scrollToBottom();
   }, [chatMessages]);
 
+  // Redirect to dashboard when onboarding is complete
+  useEffect(() => {
+    if (state.phase === "complete" && state.analysisProgress >= 100) {
+      // Small delay to show the completion message first
+      const timer = setTimeout(() => {
+        redirect("/dashboard");
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [state.phase, state.analysisProgress]);
+
   function scrollToBottom() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }
