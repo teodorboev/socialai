@@ -64,6 +64,12 @@ model Organization {
   attentionItems     AttentionItem[]
   onboardingReport   OnboardingReport?
   circuitBreakers    CircuitBreaker[]
+  
+  // Self-Evaluation & DNA
+  contentFingerprints ContentFingerprint[]
+  postMortems       PostMortem[]
+  agentScorecards    AgentScorecard[]
+  dnaProfiles       DNAProfile[]
 
   @@map("organizations")
 }
@@ -193,6 +199,8 @@ model Content {
   schedule         Schedule?
   engagements      Engagement[]
   generatedVisuals GeneratedVisual[]
+  fingerprint      ContentFingerprint?
+  postMortem      PostMortem?
 
   @@index([organizationId, status])
   @@index([organizationId, platform, createdAt])
@@ -1279,6 +1287,176 @@ model GeneratedVisual {
   @@index([organizationId, contentId])
   @@index([organizationId, type])
   @@map("generated_visuals")
+}
+
+// ============================================================
+// CONTENT DNA FINGERPRINTING
+// ============================================================
+
+model ContentFingerprint {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId  String   @map("organization_id") @db.Uuid
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  contentId       String   @unique @map("content_id") @db.Uuid
+  content         Content  @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  platform        Platform
+  
+  // HOOK DNA
+  hookType        String   @map("hook_type") // "question", "statistic", "bold_claim", "story_opener", "how_to", "list_number", "controversy", "curiosity_gap"
+  hookLength      Int      @map("hook_length")
+  hookUsesNumber  Boolean  @default(false) @map("hook_uses_number")
+  hookUsesEmoji   Boolean  @default(false) @map("hook_uses_emoji")
+  hookUsesYou     Boolean  @default(false) @map("hook_uses_you") // addresses reader directly
+  hookEmotionalTone String  @map("hook_emotional_tone") // "surprise", "urgency", "curiosity", "empathy", "authority"
+  
+  // CONTENT DNA
+  topic           String
+  subtopic        String?
+  angle           String   @map("content_angle") // "educational", "inspirational", "entertaining", "promotional", "behind_scenes"
+  structure       String   @map("content_structure") // "tip_list", "story_arc", "problem_solution", "before_after", "myth_bust", "how_to"
+  captionLength   Int      @map("caption_length")
+  paragraphCount  Int      @map("paragraph_count")
+  usesLineBreaks  Boolean  @default(false) @map("uses_line_breaks")
+  readabilityLevel String  @map("readability_level") // "simple", "moderate", "complex"
+  callToAction    String?  @map("call_to_action") // "save", "comment", "click_link", "follow", "share", "none"
+  ctaPlacement    String?  @map("cta_placement") // "end", "middle", "beginning"
+  
+  // VISUAL DNA
+  visualType      String?  @map("visual_type") // "ai_photo", "product_shot", "text_overlay", "carousel", "reel", "infographic"
+  visualProvider  String?  @map("visual_provider")
+  dominantColor   String?  @map("dominant_color")
+  brightness      String?  @map("brightness") // "light", "medium", "dark"
+  hasText         Boolean  @default(false) @map("has_text")
+  textAmount      String?  @map("text_amount") // "none", "minimal", "moderate", "heavy"
+  hasProduct      Boolean  @default(false) @map("has_product")
+  hasPerson       Boolean  @default(false) @map("has_person")
+  layout          String?  @map("layout") // "centered", "left_aligned", "full_bleed", "split"
+  slideCount      Int?     @map("slide_count")
+  
+  // TIMING DNA
+  dayOfWeek       Int      @map("day_of_week") // 0=Sun ... 6=Sat
+  hourOfDay       Int      @map("hour_of_day")
+  isWeekend       Boolean  @default(false) @map("is_weekend")
+  seasonalContext String?  @map("seasonal_context") // "none", "holiday_adjacent", "seasonal_topic", "cultural_moment"
+  
+  // DISTRIBUTION DNA
+  hashtagCount    Int      @map("hashtag_count")
+  hashtagMix      String?  @map("hashtag_mix") // "mostly_niche", "mostly_discovery", "balanced", "branded_heavy"
+  mentionsCount   Int      @default(0) @map("mentions_count")
+  hasLocation     Boolean  @default(false) @map("has_location")
+  
+  // PERFORMANCE (filled after 7 days)
+  engagementRate  Float?   @map("engagement_rate")
+  reachRate       Float?   @map("reach_rate")
+  saveRate        Float?   @map("save_rate")
+  shareRate       Float?   @map("share_rate")
+  commentRate     Float?   @map("comment_rate")
+  impressions     Int?     @map("impressions")
+  reach           Int?     @map("reach")
+  likes           Int?     @map("likes")
+  comments        Int?     @map("comments")
+  shares          Int?     @map("shares")
+  saves           Int?     @map("saves")
+  clicks          Int?     @map("clicks")
+  percentileRank  Float?   @map("percentile_rank")
+  
+  // Status
+  evaluatedAt     DateTime? @map("evaluated_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+  
+  @@index([organizationId, platform])
+  @@index([organizationId, evaluatedAt])
+  @@index([organizationId, hookType])
+  @@index([organizationId, topic])
+  @@index([organizationId, angle])
+  @@map("content_fingerprints")
+}
+
+// ============================================================
+// POST-MORTEM EVALUATION
+// ============================================================
+
+model PostMortem {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId  String   @map("organization_id") @db.Uuid
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  contentId       String   @unique @map("content_id") @db.Uuid
+  content         Content  @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  
+  actualPerformance Json    @map("actual_performance")
+  agentEvaluations Json    @map("agent_evaluations")
+  overallVerdict  String   @map("overall_verdict") // "hit", "miss", "average"
+  keyLearnings    String[] @map("key_learnings")
+  
+  evaluatedAt     DateTime @default(now()) @map("evaluated_at")
+  
+  @@index([organizationId, evaluatedAt])
+  @@index([organizationId, overallVerdict])
+  @@map("post_mortems")
+}
+
+// ============================================================
+// AGENT SCORECARD
+// ============================================================
+
+model AgentScorecard {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId  String   @map("organization_id") @db.Uuid
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  agentName       String   @map("agent_name")
+  period          String   // "2026-02", "2026-Q1"
+  totalEvaluations Int     @default(0) @map("total_evaluations")
+  avgAccuracy     Float    @default(0) @map("avg_accuracy")
+  trend           String?  // "improving", "stable", "declining"
+  topLessons      String[] @default([]) @map("top_lessons")
+  
+  updatedAt       DateTime @updatedAt @map("updated_at")
+  
+  @@unique([organizationId, agentName, period])
+  @@map("agent_scorecards")
+}
+
+// ============================================================
+// DNA PROFILE
+// ============================================================
+
+model DNAProfile {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId  String   @unique @map("organization_id") @db.Uuid
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  platform        Platform
+  
+  // Winning DNA combinations (high performers)
+  winningHooks    String[] @default([]) @map("winning_hooks")
+  winningTopics   String[] @default([]) @map("winning_topics")
+  winningAngles   String[] @default([]) @map("winning_angles")
+  winningStructures String[] @default([]) @map("winning_structures")
+  winningVisualTypes String[] @default([]) @map("winning_visual_types")
+  winningDays     Int[]    @default([]) @map("winning_days")
+  winningHours    Int[]    @default([]) @map("winning_hours")
+  winningHashtagMix String? @map("winning_hashtag_mix")
+  
+  // Losing DNA combinations (underperformers)
+  losingHooks     String[] @default([]) @map("losing_hooks")
+  losingTopics    String[] @default([]) @map("losing_topics")
+  losingAngles    String[] @default([]) @map("losing_angles")
+  
+  // Fatigue scores (avoid over-repetition)
+  hookFatigue     Json     @default("{}") @map("hook_fatigue") // { "question": 0.8, ... }
+  topicFatigue    Json     @default("{}") @map("topic_fatigue")
+  angleFatigue    Json     @default("{}") @map("angle_fatigue")
+  
+  // Stats
+  totalPostsAnalyzed Int    @default(0) @map("total_posts_analyzed")
+  hitRate          Float    @default(0) @map("hit_rate")
+  avgEngagement    Float    @default(0) @map("avg_engagement")
+  
+  lastUpdatedAt   DateTime @default(now()) @map("last_updated_at")
+  createdAt       DateTime @default(now()) @map("created_at")
+  
+  @@unique([organizationId, platform])
+  @@map("dna_profiles")
 }
 
 // ============================================================
