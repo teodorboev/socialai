@@ -80,3 +80,15 @@ export {
   onAccountConnected,
   onScheduleImmediate 
 } from "./event-handlers";
+
+// Self-Evaluation
+export { dailySelfEvaluation } from "./daily-self-evaluation";
+
+// DNA Updates
+export { weeklyDNAUpdate } from "./weekly-dna-update";
+
+// Goal Tracking
+export { weeklyGoalCheck } from "./weekly-goal-check";
+
+// Network Intelligence
+export { monthlyNetworkAggregation } from "./monthly-network-aggregation";
