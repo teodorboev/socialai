@@ -1547,6 +1547,49 @@ enum CheckpointStatus {
 }
 
 // ============================================================
+// NETWORK INTELLIGENCE (Inter-Client Learning)
+// ============================================================
+
+model PlatformInsight {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  
+  // Insight categorization
+  industry        String    // "skincare", "food", "tech", etc.
+  insightType     InsightType
+  platform        Platform?
+  
+  // The insight itself (anonymized)
+  pattern         String    @db.Text // "Carousel posts get 3.2x more engagement"
+  supportingData Json?     @map("supporting_data") // Anonymized stats
+  
+  // Confidence scoring
+  confidence      Float     @default(0.5) // 0-1, based on how many clients show this pattern
+  evidenceCount   Int       @default(1) @map("evidence_count") // How many clients support this
+  lastValidated   DateTime? @map("last_validated")
+  
+  // Lifecycle
+  isActive       Boolean   @default(true) @map("is_active")
+  archivedAt     DateTime? @map("archived_at")
+  archiveReason  String?   @map("archive_reason")
+  
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+  
+  @@index([industry, insightType])
+  @@index([industry, platform])
+  @@index([isActive, confidence])
+  @@map("platform_insights")
+}
+
+enum InsightType {
+  content_format     // "carousels outperform static"
+  hook_type          // "question hooks work best"
+  posting_time      // "Tuesday 9am is best"
+  hashtag_strategy  // "niche hashtags outperform mega"
+  visual_style      // "minimal text overlays work"
+  engagement_tactic // "asking questions drives comments"
+  campaign_type     // "product launches work well"
+}
 // SHARED MEMORY (pgvector)
 // ============================================================
 
