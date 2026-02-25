@@ -27,7 +27,7 @@ type AgentName =
   | "ORCHESTRATOR"
   | "STRATEGY"
   | "CONTENT_CREATOR"
-  | "VISUAL"
+  | "CREATIVE_DIRECTOR"
   | "PUBLISHER"
   | "ENGAGEMENT"
   | "ANALYTICS"
@@ -81,7 +81,7 @@ const agentNames: AgentName[] = [
   "ORCHESTRATOR",
   "STRATEGY",
   "CONTENT_CREATOR",
-  "VISUAL",
+  "CREATIVE_DIRECTOR",
   "PUBLISHER",
   "ENGAGEMENT",
   "ANALYTICS",

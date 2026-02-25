@@ -48,6 +48,11 @@ model Organization {
   aiPreferences     AIPreference[]
   aiExemplars       AIExemplar[]
 
+  // Creative Director
+  visualBrandIdentity VisualBrandIdentity?
+  brandAssets       BrandAsset[]
+  generatedVisuals GeneratedVisual[]
+
   @@map("organizations")
 }
 
@@ -175,6 +180,7 @@ model Content {
   contentPlan      ContentPlan?    @relation(fields: [contentPlanId], references: [id])
   schedule         Schedule?
   engagements      Engagement[]
+  generatedVisuals GeneratedVisual[]
 
   @@index([organizationId, status])
   @@index([organizationId, platform, createdAt])
@@ -393,7 +399,7 @@ enum AgentName {
   ORCHESTRATOR
   STRATEGY
   CONTENT_CREATOR
-  VISUAL
+  CREATIVE_DIRECTOR
   PUBLISHER
   ENGAGEMENT
   ANALYTICS
@@ -872,4 +878,119 @@ model AIExemplar {
 
   @@index([organizationId, agentName])
   @@map("ai_exemplars")
+}
+
+// ============================================================
+// CREATIVE DIRECTOR - VISUAL BRAND IDENTITY
+// ============================================================
+
+model VisualBrandIdentity {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId  String   @unique @map("organization_id") @db.Uuid
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Colors
+  primaryColor    String   @default("#000000") @map("primary_color")
+  secondaryColor  String   @default("#FFFFFF") @map("secondary_color")
+  accentColor     String   @default("#808080") @map("accent_color")
+  backgroundColor String   @default("#FFFFFF") @map("background_color")
+  textColor      String   @default("#000000") @map("text_color")
+  colorPalette    String[] @default([]) @map("color_palette")
+
+  // Typography
+  headingFont     String   @default("Inter") @map("heading_font")
+  bodyFont        String   @default("Inter") @map("body_font")
+  fontWeights     Json     @default("{\"heading\": \"bold\", \"body\": \"regular\", \"accent\": \"medium\"}") @map("font_weights")
+
+  // Photography style
+  photoStyle      String   @default("") 
+  photoMood       String   @default("")
+  photoSubjects   String[] @default([]) @map("photo_subjects")
+  photoAvoid     String[] @default([]) @map("photo_avoid")
+
+  // Illustration style
+  illustrationStyle String?  @map("illustration_style")
+  useIllustrations Boolean  @default(false) @map("use_illustrations")
+
+  // Layout preferences
+  preferMinimalDesign Boolean @default(true) @map("prefer_minimal_design")
+  preferWhitespace    Boolean @default(true) @map("prefer_whitespace")
+  textOverlayStyle   String   @default("clean") @map("text_overlay_style")
+
+  // Logo
+  logoUrl         String?  @map("logo_url")
+  logoMarkUrl     String?  @map("logo_mark_url")
+  logoWhiteUrl    String?  @map("logo_white_url")
+  logoPadding     Int      @default(20) @map("logo_padding")
+
+  // Style seed for consistency
+  styleSeedUrl    String?  @map("style_seed_url")
+
+  // Detected by onboarding
+  detectedStyle   Json?    @map("detected_style")
+  styleConfirmed  Boolean  @default(false) @map("style_confirmed")
+
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@map("visual_brand_identities")
+}
+
+// ============================================================
+// BRAND ASSET LIBRARY
+// ============================================================
+
+model BrandAsset {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId  String   @map("organization_id") @db.Uuid
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  type            String   // "logo", "product_photo", "lifestyle_photo", "icon", "pattern", "texture", "font_file"
+  name            String
+  description     String?
+  storageUrl      String   @map("storage_url")
+  thumbnailUrl    String?  @map("thumbnail_url")
+  mimeType        String   @map("mime_type")
+  width           Int?
+  height          Int?
+  tags            String[] @default([])
+  usageCount      Int      @default(0) @map("usage_count")
+  lastUsedAt      DateTime? @map("last_used_at")
+  uploadedBy      String?  @map("uploaded_by")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@index([organizationId, type])
+  @@index([organizationId, tags])
+  @@map("brand_assets")
+}
+
+// ============================================================
+// GENERATED VISUALS
+// ============================================================
+
+model GeneratedVisual {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId  String   @map("organization_id") @db.Uuid
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  contentId       String?  @map("content_id") @db.Uuid
+  content         Content?  @relation(fields: [contentId], references: [id], onDelete: SetNull)
+  type            String   // "ai_generated", "template", "carousel_slide", "video_storyboard", "product_composite", "text_overlay", "infographic", "thumbnail", "ugc_frame", "before_after"
+  platform        Platform
+  format          String   // "feed_square", "story", "reel", "carousel", etc.
+  dimensions      Json     @map("dimensions") // { width, height }
+  storageUrl      String?  @map("storage_url")
+  thumbnailUrl    String?  @map("thumbnail_url")
+  prompt          String?  @db.Text
+  templateData    Json?    @map("template_data")
+  videoScript     Json?    @map("video_script")
+  altText         String   @map("alt_text")
+  assetsUsed      String[] @default([]) @map("assets_used")
+  provider        String?  // "flux", "dall-e-3", "ideogram", "template_engine"
+  generationCost  Float?   @map("generation_cost")
+  slideNumber     Int?     @map("slide_number")
+  confidenceScore Float   @default(0) @map("confidence_score")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@index([organizationId, contentId])
+  @@index([organizationId, type])
+  @@map("generated_visuals")
 }
