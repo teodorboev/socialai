@@ -4,8 +4,9 @@ import { createClient } from "@/lib/supabase/client";
 import { redirect } from "next/navigation";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Sparkles, MessageCircle, User, Bell, Menu, X, AlertTriangle, Pause, Play } from "lucide-react";
+import { Sparkles, MessageCircle, User, Bell, Menu, X, AlertTriangle, Pause, Play, ShieldAlert } from "lucide-react";
 import Link from "next/link";
+import { CrisisIndicator } from "@/components/crisis-mode/crisis-overlay";
 
 type AIStatus = "running" | "paused" | "crisis";
 
@@ -17,6 +18,7 @@ export default function MissionControlLayout({ children }: MissionControlLayoutP
   const [loading, setLoading] = useState(true);
   const [aiStatus, setAiStatus] = useState<AIStatus>("running");
   const [notificationCount, setNotificationCount] = useState(0);
+  const [hasCrisis, setHasCrisis] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
@@ -59,6 +61,19 @@ export default function MissionControlLayout({ children }: MissionControlLayoutP
         .eq("status", "OPEN");
       
       setNotificationCount(count || 0);
+
+      // Check for critical escalations (crisis mode)
+      const { count: criticalCount } = await supabase
+        .from("escalations")
+        .select("*", { count: "exact", head: true })
+        .eq("organization_id", orgMember.organization_id)
+        .eq("status", "OPEN")
+        .eq("priority", "CRITICAL");
+      
+      if (criticalCount && criticalCount > 0) {
+        setHasCrisis(true);
+        setAiStatus("crisis");
+      }
     }
 
     setLoading(false);
@@ -99,14 +114,17 @@ export default function MissionControlLayout({ children }: MissionControlLayoutP
               <X className="h-6 w-6" />
             </button>
             <nav className="mt-12 space-y-4">
-              <Link href="/" className="block py-2 text-lg font-medium">
+              <Link href="/mission-control" className="block py-2 text-lg font-medium">
                 Mission Control
               </Link>
-              <Link href="/feed" className="block py-2 text-lg text-slate-400">
+              <Link href="/mission-control/feed" className="block py-2 text-lg text-slate-400">
                 Activity Feed
               </Link>
-              <Link href="/ask" className="block py-2 text-lg text-slate-400">
+              <Link href="/mission-control/ask" className="block py-2 text-lg text-slate-400">
                 Talk to AI
+              </Link>
+              <Link href="/mission-control/notifications" className="block py-2 text-lg text-slate-400">
+                Notifications
               </Link>
             </nav>
           </div>
@@ -114,7 +132,9 @@ export default function MissionControlLayout({ children }: MissionControlLayoutP
       )}
 
       {/* Header */}
-      <header className="border-b border-slate-800 bg-slate-900/50 backdrop-blur-sm sticky top-0 z-40">
+      <header className={`border-b bg-slate-900/50 backdrop-blur-sm sticky top-0 z-40 ${
+        aiStatus === "crisis" ? "border-red-800 bg-red-950/30" : "border-slate-800"
+      }`}>
         <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
           {/* Left: Menu + Logo */}
           <div className="flex items-center gap-3">
@@ -124,28 +144,35 @@ export default function MissionControlLayout({ children }: MissionControlLayoutP
             >
               <Menu className="h-5 w-5" />
             </button>
-            <Link href="/" className="flex items-center gap-2">
+            <Link href="/mission-control" className="flex items-center gap-2">
               <div className={`w-2.5 h-2.5 rounded-full ${statusColors[aiStatus]}`} />
               <Sparkles className="h-5 w-5 text-blue-400" />
               <span className="font-semibold hidden sm:inline">SocialAI</span>
             </Link>
-            <span className="hidden sm:inline text-slate-400 text-sm ml-2">
-              {statusText[aiStatus]}
-            </span>
+            {aiStatus === "crisis" ? (
+              <Link href="/mission-control/crisis">
+                <CrisisIndicator />
+              </Link>
+            ) : (
+              <span className="hidden sm:inline text-slate-400 text-sm ml-2">
+                {statusText[aiStatus]}
+              </span>
+            )}
           </div>
 
           {/* Right: Actions */}
           <div className="flex items-center gap-2">
             {aiStatus === "crisis" && (
-              <Button 
-                variant="outline" 
-                size="sm"
-                className="border-red-600 text-red-400 hover:bg-red-900/20"
-                onClick={() => setAiStatus("running")}
-              >
-                <Play className="h-4 w-4 mr-1" />
-                Resume
-              </Button>
+              <Link href="/mission-control/crisis">
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  className="border-red-600 text-red-400 hover:bg-red-900/20"
+                >
+                  <ShieldAlert className="h-4 w-4 mr-1" />
+                  View Crisis
+                </Button>
+              </Link>
             )}
             {aiStatus === "running" && (
               <Button 
@@ -157,13 +184,23 @@ export default function MissionControlLayout({ children }: MissionControlLayoutP
                 <span className="hidden sm:inline">Pause</span>
               </Button>
             )}
-            <Link href="/ask">
+            {aiStatus === "paused" && (
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={() => setAiStatus("running")}
+              >
+                <Play className="h-4 w-4 mr-1" />
+                <span className="hidden sm:inline">Resume</span>
+              </Button>
+            )}
+            <Link href="/mission-control/ask">
               <Button variant="ghost" size="sm">
                 <MessageCircle className="h-4 w-4 mr-1" />
                 <span className="hidden sm:inline">Talk to AI</span>
               </Button>
             </Link>
-            <Link href="/notifications">
+            <Link href="/mission-control/notifications">
               <Button variant="ghost" size="sm" className="relative">
                 <Bell className="h-4 w-4" />
                 {notificationCount > 0 && (
