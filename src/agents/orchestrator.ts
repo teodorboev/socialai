@@ -69,6 +69,24 @@ export class Orchestrator {
       });
     }
 
+    // Check if we need visuals generated for existing content
+    // Content that is approved/scheduled but doesn't have media URLs
+    const contentWithoutVisuals = await prisma.content.count({
+      where: {
+        organizationId,
+        status: { in: ["APPROVED", "SCHEDULED", "PENDING_REVIEW"] },
+        mediaUrls: { isEmpty: true },
+      },
+    });
+
+    if (contentWithoutVisuals > 0) {
+      tasks.push({
+        agent: "CREATIVE_DIRECTOR",
+        priority: "MEDIUM",
+        reason: `${contentWithoutVisuals} content items need visuals generated`,
+      });
+    }
+
     // Check if we need a new strategy
     const activePlan = org.contentPlans[0];
     if (!activePlan || new Date(activePlan.periodEnd) < new Date()) {

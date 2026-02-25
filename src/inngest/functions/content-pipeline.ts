@@ -1,5 +1,6 @@
 import { inngest } from "../client";
 import { ContentCreatorAgent } from "@/agents/content-creator";
+import { CreativeDirectorAgent } from "@/agents/creative-director";
 import { prisma } from "@/lib/prisma";
 import { resolveAction, getContentStatusFromAction, DEFAULT_THRESHOLDS } from "@/agents/shared/confidence";
 
@@ -112,11 +113,29 @@ export const contentPipeline = inngest.createFunction(
           },
         });
 
+        // Step 3: Generate visuals with Creative Director
+        let hasVisuals = false;
+        try {
+          const visualAgent = new CreativeDirectorAgent();
+          const visualResult = await visualAgent.run(org.id, {
+            organizationId: org.id,
+            contentId: savedContent.id,
+            caption: content.caption,
+            contentType: content.contentType,
+            platform: account.platform,
+          });
+          hasVisuals = !!(visualResult as { data?: { visuals?: unknown[] } })?.data?.visuals?.length;
+        } catch (error) {
+          console.error("Visual generation failed:", error);
+          // Continue even if visual generation fails - content is still valid
+        }
+
         return {
           success: true,
           contentId: savedContent.id,
           status,
           confidenceScore: result.confidenceScore,
+          hasVisuals,
         };
       });
 
