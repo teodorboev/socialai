@@ -8,6 +8,7 @@ import { StrategyAgent } from "@/agents/strategy";
 import { TrendScoutAgent } from "@/agents/trend-scout";
 import { prisma } from "@/lib/prisma";
 import { getConfidenceThresholds, determineContentAction } from "@/lib/confidence";
+import { canRunAgent, canPublish, getEntitlements } from "@/lib/billing/entitlements";
 import type { AgentName, Platform, ContentStatus } from "@prisma/client";
 
 export type PipelineName =
@@ -136,6 +137,14 @@ export class Pipeline {
     organizationId: string,
     input?: Record<string, unknown>
   ): Promise<unknown> {
+    // BILLING GATE: Check if agent is allowed for this org's plan
+    const allowed = await canRunAgent(organizationId, agent);
+    if (!allowed) {
+      const entitlements = await getEntitlements(organizationId);
+      console.log(`Skipping ${agent} for org ${organizationId} - not in plan (${entitlements.plan?.agentTier ?? 'no plan'})`);
+      return { skipped: true, reason: "not_in_plan" };
+    }
+
     switch (agent) {
       case "CONTENT_CREATOR": {
         const agent = new ContentCreatorAgent();
@@ -235,16 +244,20 @@ export const contentPipeline = inngest.createFunction(
     cron: "0 */4 * * *",
   },
   async ({ step }) => {
+    // BILLING GATE: Only run for organizations with active/trialing subscriptions
     const organizations = await step.run("get-active-organizations", async () => {
       return prisma.organization.findMany({
         where: {
-          plan: { not: "STARTER" },
+          subscription: {
+            status: { in: ["active", "trialing"] },
+          },
           brandConfig: { isNot: null },
         },
         include: {
           brandConfig: true,
           socialAccounts: { where: { isActive: true } },
           orgSettings: true,
+          subscription: true,
         },
         take: 10,
       });

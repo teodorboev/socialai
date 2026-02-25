@@ -363,7 +363,7 @@ export async function saveFingerprint(
     data: {
       organizationId,
       contentId,
-      platform,
+      platform: platform as any,
       ...data,
     },
   });

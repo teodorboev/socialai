@@ -16,7 +16,7 @@ export type GoalType =
   | "generate_leads"
   | "launch_product"
   | "build_community"
-  | "improved_brand_perception"
+  | "improve_brand_perception"
   | "custom";
 
 export interface GoalTargets {

@@ -1,6 +1,49 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { stripe, PLANS, createCheckoutSession, createCustomerPortalSession } from "@/lib/stripe";
+import { prisma } from "@/lib/prisma";
+
+/**
+ * GET /api/billing - Fetch available plans
+ */
+export async function GET() {
+  try {
+    const plans = await prisma.billingPlan.findMany({
+      where: {
+        isActive: true,
+        isPublic: true,
+      },
+      include: {
+        stripePrices: {
+          where: { isActive: true },
+        },
+      },
+      orderBy: { sortOrder: "asc" },
+    });
+
+    const formatted = plans.map((plan: any) => ({
+      id: plan.id,
+      name: plan.name,
+      slug: plan.slug,
+      description: plan.description,
+      agentTier: plan.agentTier,
+      trialDays: plan.trialDays,
+      prices: plan.stripePrices.reduce((acc: any, price: any) => {
+        if (!acc[price.currency]) acc[price.currency] = {};
+        acc[price.currency][price.interval] = {
+          amount: price.unitAmount,
+          priceId: price.stripePriceId,
+        };
+        return acc;
+      }, {}),
+    }));
+
+    return NextResponse.json({ plans: formatted });
+  } catch (error) {
+    console.error("Error fetching plans:", error);
+    return NextResponse.json({ error: "Failed to fetch plans" }, { status: 500 });
+  }
+}
 
 export async function POST(request: Request) {
   if (!stripe) {

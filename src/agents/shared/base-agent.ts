@@ -15,6 +15,8 @@ export interface AgentResult<T> {
   shouldEscalate: boolean;
   escalationReason?: string;
   tokensUsed: number;
+  inputTokens?: number;
+  outputTokens?: number;
 }
 
 export interface AgentInput {
@@ -22,6 +24,8 @@ export interface AgentInput {
   platform?: string;
   _trainingContext?: string;
   _memoryContext?: string;
+  _contentId?: string;
+  _pipelineRunId?: string;
 }
 
 export abstract class BaseAgent {
@@ -125,6 +129,32 @@ export abstract class BaseAgent {
     try {
       const result = await this.execute(enrichedInput);
       const durationMs = Date.now() - startTime;
+
+      // Record cost event if tokens were used
+      if (result.tokensUsed && result.inputTokens && result.outputTokens) {
+        const costCents = this.calculateActualCost(result.inputTokens, result.outputTokens);
+        const now = new Date();
+        const period = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+        
+        try {
+          await prisma.agentCostEvent.create({
+            data: {
+              organizationId,
+              agentName: this.agentName,
+              inputTokens: result.inputTokens,
+              outputTokens: result.outputTokens,
+              totalTokens: result.tokensUsed,
+              costCents,
+              model: this.model,
+              contentId: (input as any)?._contentId,
+              pipelineRunId: (input as any)?._pipelineRunId,
+              period,
+            },
+          });
+        } catch (costError) {
+          console.error("Failed to record cost event:", costError);
+        }
+      }
 
       await this.log(organizationId, {
         action: `${this.agentName}.execute`,
@@ -246,11 +276,17 @@ export abstract class BaseAgent {
     system,
     userMessage,
     maxTokens = 4096,
+    organizationId,
+    contentId,
+    pipelineRunId,
   }: {
     system: string;
     userMessage: string;
     maxTokens?: number;
-  }): Promise<{ text: string; tokensUsed: number }> {
+    organizationId?: string;
+    contentId?: string;
+    pipelineRunId?: string;
+  }): Promise<{ text: string; tokensUsed: number; inputTokens: number; outputTokens: number }> {
     const response = await this.client.messages.create({
       model: this.model,
       max_tokens: maxTokens,
@@ -264,9 +300,79 @@ export abstract class BaseAgent {
       throw new Error("No text response from Claude");
     }
 
-    const tokensUsed =
-      (response.usage?.input_tokens ?? 0) + (response.usage?.output_tokens ?? 0);
+    const inputTokens = response.usage?.input_tokens ?? 0;
+    const outputTokens = response.usage?.output_tokens ?? 0;
+    const tokensUsed = inputTokens + outputTokens;
 
-    return { text: textContent.text, tokensUsed };
+    // Calculate actual cost in cents using Claude pricing (Sonnet 4)
+    const costCents = this.calculateActualCost(inputTokens, outputTokens);
+
+    // Record the cost event
+    if (organizationId) {
+      await this.recordCostEvent({
+        organizationId,
+        inputTokens,
+        outputTokens,
+        totalTokens: tokensUsed,
+        costCents,
+        contentId,
+        pipelineRunId,
+      });
+    }
+
+    return { text: textContent.text, tokensUsed, inputTokens, outputTokens };
+  }
+
+  /**
+   * Calculate actual cost using Claude API pricing (in cents)
+   * Claude Sonnet 4 pricing (as of 2025):
+   * - Input: $3.00 per million tokens
+   * - Output: $15.00 per million tokens
+   */
+  protected calculateActualCost(inputTokens: number, outputTokens: number): number {
+    const inputCostPerMillion = 3.00; // $3.00 per 1M tokens
+    const outputCostPerMillion = 15.00; // $15.00 per 1M tokens
+    
+    const inputCost = (inputTokens / 1_000_000) * inputCostPerMillion;
+    const outputCost = (outputTokens / 1_000_000) * outputCostPerMillion;
+    
+    // Return in cents
+    return (inputCost + outputCost) * 100;
+  }
+
+  /**
+   * Record cost event for billing analytics
+   */
+  protected async recordCostEvent(params: {
+    organizationId: string;
+    inputTokens: number;
+    outputTokens: number;
+    totalTokens: number;
+    costCents: number;
+    contentId?: string;
+    pipelineRunId?: string;
+  }): Promise<void> {
+    try {
+      const now = new Date();
+      const period = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+      
+      await prisma.agentCostEvent.create({
+        data: {
+          organizationId: params.organizationId,
+          agentName: this.agentName,
+          inputTokens: params.inputTokens,
+          outputTokens: params.outputTokens,
+          totalTokens: params.totalTokens,
+          costCents: params.costCents,
+          model: this.model,
+          contentId: params.contentId,
+          pipelineRunId: params.pipelineRunId,
+          period,
+        },
+      });
+    } catch (error) {
+      // Don't fail the agent if cost tracking fails
+      console.error("Failed to record cost event:", error);
+    }
   }
 }

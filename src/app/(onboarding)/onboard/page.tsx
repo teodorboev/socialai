@@ -87,6 +87,18 @@ export default function OnboardPage() {
     checkExistingOnboarding();
   }, []);
 
+  // Check for checkout success
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("success") === "true") {
+      // Payment successful - start onboarding
+      setChatMessages([
+        { role: "ai", content: "Welcome! Your payment is confirmed. Let's set up your social media presence. Which platforms would you like me to manage?" }
+      ]);
+      setLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     scrollToBottom();
   }, [chatMessages]);

@@ -117,19 +117,14 @@ export const weeklyGoalCheck = inngest.createFunction(
         if (goalStatus.offTrack > 0) {
           await step.run(`create-attention-${org.id}`, async () => {
             // Create attention item for human
+            const details = `On track: ${goalStatus.onTrack}, At risk: ${goalStatus.atRisk}, Off track: ${goalStatus.offTrack}, Total: ${goals.length}`;
             await prisma.attentionItem.create({
               data: {
                 organizationId: org.id,
-                type: "goal_off_track",
+                type: "GOAL_OFF_TRACK" as any,
                 title: `Goal Progress Alert: ${goalStatus.offTrack} off track`,
-                description: `${org.name} has ${goalStatus.offTrack} goal(s) significantly behind target. Weekly progress: ${goalStatus.onTrack} on track, ${goalStatus.atRisk} at risk.`,
-                priority: goalStatus.offTrack >= goals.length / 2 ? "high" : "normal",
-                data: {
-                  onTrack: goalStatus.onTrack,
-                  atRisk: goalStatus.atRisk,
-                  offTrack: goalStatus.offTrack,
-                  totalGoals: goals.length,
-                } as any,
+                description: `${org.name} has ${goalStatus.offTrack} goal(s) significantly behind target. ${details}`,
+                priority: goalStatus.offTrack >= goals.length / 2 ? "HIGH" : "MEDIUM",
               },
             });
 

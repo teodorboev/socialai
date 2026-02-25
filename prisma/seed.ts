@@ -484,6 +484,136 @@ Identify relevant trends for the brand.`,
   }
   console.log("✓ Escalation rules seeded");
 
+  // ============================================================
+  // BILLING PLANS
+  // ============================================================
+  const billingPlans = [
+    {
+      name: "Starter",
+      slug: "starter",
+      description: "Perfect for small businesses getting started with AI social media",
+      agentTier: "core",
+      trialDays: 14,
+      maxPlatforms: 2,
+      maxPostsPerMonth: 40,
+      maxBrands: 1,
+      maxTeamMembers: 1,
+      isUsageBased: false,
+      isActive: true,
+      isPublic: true,
+      sortOrder: 1,
+      prices: {
+        usd: { month: 1999, year: 19990 },
+        eur: { month: 1799, year: 17990 },
+        gbp: { month: 1599, year: 15990 },
+      },
+    },
+    {
+      name: "Growth",
+      slug: "growth",
+      description: "For growing businesses that need more platforms and advanced AI",
+      agentTier: "intelligence",
+      trialDays: 14,
+      maxPlatforms: 4,
+      maxPostsPerMonth: 80,
+      maxBrands: 1,
+      maxTeamMembers: 3,
+      isUsageBased: false,
+      isActive: true,
+      isPublic: true,
+      sortOrder: 2,
+      prices: {
+        usd: { month: 4999, year: 49990 },
+        eur: { month: 4499, year: 44990 },
+        gbp: { month: 3999, year: 39990 },
+      },
+    },
+    {
+      name: "Pro",
+      slug: "pro",
+      description: "For agencies and businesses that need full AI capabilities",
+      agentTier: "full",
+      trialDays: 14,
+      maxPlatforms: -1, // unlimited
+      maxPostsPerMonth: -1, // unlimited
+      maxBrands: 5,
+      maxTeamMembers: 10,
+      isUsageBased: false,
+      isActive: true,
+      isPublic: true,
+      sortOrder: 3,
+      prices: {
+        usd: { month: 9999, year: 99990 },
+        eur: { month: 8999, year: 89990 },
+        gbp: { month: 7999, year: 79990 },
+      },
+    },
+    {
+      name: "Agency",
+      slug: "agency",
+      description: "Usage-based pricing for agencies managing multiple clients",
+      agentTier: "full",
+      trialDays: 14,
+      maxPlatforms: -1,
+      maxPostsPerMonth: -1,
+      maxBrands: -1,
+      maxTeamMembers: -1,
+      isUsageBased: true,
+      usageUnitName: "client",
+      usageIncluded: 10,
+      overagePerUnit: { usd: 85, eur: 77, gbp: 68 },
+      isActive: true,
+      isPublic: true,
+      sortOrder: 4,
+      prices: {
+        usd: { month: 8500, year: 85000 },
+        eur: { month: 7700, year: 77000 },
+        gbp: { month: 6800, year: 68000 },
+      },
+    },
+  ];
+
+  for (const plan of billingPlans) {
+    const { prices, ...planData } = plan;
+    
+    const planWithDefaults = {
+      ...planData,
+      features: {},
+      enabledAgents: [] as string[],
+    };
+    
+    const created = await prisma.billingPlan.upsert({
+      where: { slug: plan.slug },
+      update: planWithDefaults,
+      create: planWithDefaults,
+    });
+
+    // Create prices for each currency/interval
+    for (const [currency, currencyPrices] of Object.entries(prices)) {
+      for (const [interval, amount] of Object.entries(currencyPrices as Record<string, number>)) {
+        await prisma.stripePlanPrice.upsert({
+          where: {
+            billingPlanId_currency_interval: {
+              billingPlanId: created.id,
+              currency,
+              interval,
+            },
+          },
+          update: { unitAmount: amount },
+          create: {
+            billingPlanId: created.id,
+            currency,
+            interval,
+            unitAmount: amount,
+            stripeProductId: "",
+            stripePriceId: "",
+          },
+        });
+      }
+    }
+  }
+  console.log("✓ Billing plans seeded");
+
   console.log("\n✅ Seeding complete!");
 }
 

@@ -271,18 +271,18 @@ export async function getIndustryInsights(
   industry: string,
   platform?: string
 ): Promise<any[]> {
-  let query = prisma.platformInsight.findMany({
-    where: {
-      industry,
-      isActive: true,
-      confidence: { gte: 0.5 }, // Only show confident insights
-    },
-    orderBy: { confidence: "desc" },
-  });
+  const where: any = {
+    industry,
+    isActive: true,
+    confidence: { gte: 0.5 }, // Only show confident insights
+  };
 
   if (platform) {
-    query = query.where({ platform: platform as any });
+    where.platform = platform;
   }
 
-  return query;
+  return prisma.platformInsight.findMany({
+    where,
+    orderBy: { confidence: "desc" },
+  });
 }

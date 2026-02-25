@@ -74,6 +74,11 @@ model Organization {
   // Goal Tracking
   goals             Goal[]
 
+  // Billing
+  subscription      Subscription?
+  billingEvents     BillingEvent[]
+  agentCostEvents   AgentCostEvent[]
+
   @@map("organizations")
 }
 
@@ -1166,6 +1171,7 @@ enum AttentionType {
   WARNING
   OPPORTUNITY
   SYSTEM_ALERT
+  GOAL_OFF_TRACK
 }
 
 enum AttentionPriority {
@@ -1625,4 +1631,173 @@ model Memory {
   @@index([organizationId, createdAt])
   @@index([organizationId, importance])
   @@map("memory")
+}
+
+// ============================================================
+// BILLING - PLAN DEFINITIONS
+// ============================================================
+
+model BillingPlan {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name            String
+  slug            String   @unique
+  description     String?
+  isActive        Boolean  @default(true)
+  isPublic        Boolean  @default(true)
+  sortOrder       Int      @default(0)
+
+  // Trial
+  trialDays       Int      @default(14)
+
+  // Limits
+  maxPlatforms    Int      // 2, 4, -1 (unlimited)
+  maxPostsPerMonth Int     // 40, 80, -1 (unlimited)
+  maxBrands       Int      @default(1)
+  maxTeamMembers  Int      @default(1)
+
+  // Agent access
+  agentTier       String   // "core", "intelligence", "full", "custom"
+  enabledAgents   String[] // Explicit list if agentTier is "custom"
+
+  // Feature flags
+  features        Json     // { "creative_director": true, "roi_attribution": false, ... }
+
+  // Stripe references
+  stripePrices    StripePlanPrice[]
+
+  // Usage-based pricing
+  isUsageBased    Boolean  @default(false)
+  usageUnitName   String?  // "client", "post", "api_call"
+  usageIncluded   Int?     // Included units before overage
+  overagePerUnit  Json?    // { "usd": 0.50, "eur": 0.45 } per extra unit
+
+  subscriptions   Subscription[]
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model StripePlanPrice {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  billingPlanId   String   @map("billing_plan_id") @db.Uuid
+  billingPlan     BillingPlan @relation(fields: [billingPlanId], references: [id], onDelete: Cascade)
+
+  currency        String   // "usd", "eur", "gbp", "brl", "jpy", etc.
+  interval        String   // "month", "year"
+
+  // Prices in smallest currency unit (cents, pence, yen, etc.)
+  unitAmount      Int      // 19900 = $199.00, 17900 = €179.00
+
+  // Stripe IDs
+  stripeProductId String   @map("stripe_product_id")
+  stripePriceId   String   @map("stripe_price_id")
+
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([billingPlanId, currency, interval])
+  @@index([stripePriceId])
+}
+
+// ============================================================
+// BILLING - ORGANIZATION SUBSCRIPTIONS
+// ============================================================
+
+model Subscription {
+  id                  String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId      String   @unique @map("organization_id") @db.Uuid
+  organization        Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  billingPlanId       String   @map("billing_plan_id") @db.Uuid
+  billingPlan         BillingPlan @relation(fields: [billingPlanId], references: [id])
+
+  // Stripe
+  stripeCustomerId    String   @unique @map("stripe_customer_id")
+  stripeSubscriptionId String  @unique @map("stripe_subscription_id")
+  stripePriceId        String   @map("stripe_price_id")
+  stripeSubscriptionItemId String? @map("stripe_subscription_item_id")
+
+  // State
+  status              String   // "trialing", "active", "past_due", "canceled", "paused", "unpaid"
+  currency            String   @default("usd")
+  interval            String   @default("month")
+  currentPeriodStart  DateTime @map("current_period_start")
+  currentPeriodEnd    DateTime @map("current_period_end")
+
+  // Trial
+  trialStart          DateTime? @map("trial_start")
+  trialEnd            DateTime? @map("trial_end")
+
+  // Cancellation
+  cancelAtPeriodEnd   Boolean  @default(false) @map("cancel_at_period_end")
+  canceledAt          DateTime? @map("canceled_at")
+  cancellationReason  String?  @map("cancellation_reason")
+
+  // Usage
+  currentUsage        Int      @default(0) @map("current_usage")
+
+  // Dunning
+  failedPaymentCount  Int      @default(0) @map("failed_payment_count")
+  lastPaymentFailedAt DateTime? @map("last_payment_failed_at")
+  dunningStep         Int      @default(0) // 0=none, 1=first warning, 2=second, 3=final
+
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([status])
+  @@index([stripeCustomerId])
+}
+
+// ============================================================
+// BILLING - EVENTS LOG
+// ============================================================
+
+model BillingEvent {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId  String?  @map("organization_id") @db.Uuid
+  organization    Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  eventType       String   @map("event_type") // "subscription_created", "payment_succeeded", "payment_failed", "plan_changed", "canceled", "trial_ending"
+  stripeEventId   String?  @unique @map("stripe_event_id")
+  data            Json
+  processedAt     DateTime? @map("processed_at")
+  createdAt       DateTime @default(now())
+
+  @@index([organizationId, eventType])
+  @@index([stripeEventId])
+}
+
+// ============================================================
+// AGENT COST TRACKING (Usage-based)
+// ============================================================
+
+model AgentCostEvent {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId  String   @map("organization_id") @db.Uuid
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  agentName       String   @map("agent_name")
+
+  // Token usage
+  inputTokens     Int      @default(0) @map("input_tokens")
+  outputTokens    Int      @default(0) @map("output_tokens")
+  totalTokens     Int      @default(0) @map("total_tokens")
+
+  // Actual cost from provider (in cents)
+  costCents       Float    @default(0) @map("cost_cents")
+
+  // Model used
+  model           String?
+
+  // Context
+  contentId       String?  @map("content_id") @db.Uuid
+  pipelineRunId    String?  @map("pipeline_run_id") @db.Uuid
+
+  // Timestamp
+  period          String   // "2026-02" for monthly aggregation
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@index([organizationId, period])
+  @@index([organizationId, agentName, period])
+  @@index([createdAt])
 }

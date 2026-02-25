@@ -78,10 +78,16 @@ export async function findPostsForEvaluation(): Promise<string[]> {
  */
 async function getPerformanceData(contentId: string): Promise<PerformanceData | null> {
   // Try to get from analytics snapshots
+  // Note: AnalyticsSnapshot doesn't have direct content relation
+  // This would need to be looked up via socialAccountId + date
   const snapshot = await prisma.analyticsSnapshot.findFirst({
     where: {
-      content: {
-        id: contentId,
+      socialAccount: {
+        content: {
+          some: {
+            id: contentId,
+          },
+        },
       },
     },
     orderBy: {
@@ -136,8 +142,8 @@ async function calculatePercentileRank(
   
   // Get engagement rates
   const rates = posts
-    .map((p: { fingerprint: { engagementRate: number | null } | null }) => p.fingerprint?.engagementRate)
-    .filter((r: number | null): r is number => r !== null && r !== undefined);
+    .map((p: any) => p.fingerprint?.engagementRate)
+    .filter((r): r is number => r != null);
   
   if (rates.length === 0) return 50;
   
@@ -336,7 +342,7 @@ export async function updateAgentScorecard(
   // Find existing scorecard
   const existing = await prisma.agentScorecard.findUnique({
     where: {
-      organizationId_agent_name_period: {
+      organizationId_agentName_period: {
         organizationId,
         agentName,
         period,

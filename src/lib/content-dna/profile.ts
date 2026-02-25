@@ -86,18 +86,18 @@ export async function buildDNAProfile(
     where: {
       organizationId_platform: {
         organizationId,
-        platform,
+        platform: platform as any,
       },
     },
     create: {
       organizationId,
-      platform,
+      platform: platform as any,
       winningHooks,
       winningTopics,
       winningAngles,
       winningStructures,
-      winningVisualTypes,
-      winningDays,
+      winningVisualTypes: winningVisualTypes as string[],
+      winningDays: winningDays as number[],
       winningHours,
       winningHashtagMix: winningHashtagMixes[0] ?? null,
       losingHooks,
@@ -115,8 +115,8 @@ export async function buildDNAProfile(
       winningTopics,
       winningAngles,
       winningStructures,
-      winningVisualTypes,
-      winningDays,
+      winningVisualTypes: winningVisualTypes as string[],
+      winningDays: winningDays as number[],
       winningHours,
       winningHashtagMix: winningHashtagMixes[0] ?? null,
       losingHooks,
@@ -203,7 +203,7 @@ export async function getDNAProfile(
     where: {
       organizationId_platform: {
         organizationId,
-        platform,
+        platform: platform as any,
       },
     },
   });
