@@ -163,8 +163,30 @@ export async function processEngagement(
 
       // If auto_respond, send the response
       if (response.suggestedAction === "auto_respond" && response.shouldRespond) {
-        // TODO: Call platform API to post the response
-        console.log(`Would auto-respond to engagement ${engagementId}: ${response.response}`);
+        try {
+          // Get the social account to create client
+          const account = await prisma.socialAccount.findUnique({
+            where: { id: engagement.socialAccountId },
+          });
+
+          if (account && engagement.platformEngagementId) {
+            const { createSocialClient } = await import("@/lib/social/factory");
+            const client = createSocialClient(account.platform, {
+              ...account,
+              accessToken: account.accessToken,
+              refreshToken: account.refreshToken || null,
+              tokenExpiresAt: account.tokenExpiresAt ? new Date(account.tokenExpiresAt) : null,
+              createdAt: new Date(account.createdAt),
+              updatedAt: new Date(account.updatedAt),
+            } as any);
+
+            // Post the reply
+            await client.replyToComment(engagement.platformEngagementId, response.response);
+            console.log(`Auto-responded to engagement ${engagementId}: ${response.response}`);
+          }
+        } catch (apiError) {
+          console.error(`Failed to auto-respond to engagement ${engagementId}:`, apiError);
+        }
       }
 
       // Create escalation if needed

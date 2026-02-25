@@ -224,8 +224,49 @@ export async function generateWeeklyReport(organizationId: string): Promise<void
       // Store the report (could be in a separate table or as JSON)
       console.log("Generated report:", report.summary);
 
-      // TODO: Send email report via Resend
-      // TODO: Store recommendations in ContentPlan for other agents to use
+      // Update the content plan with recommendations for other agents
+      if (previousContentPlan && report.recommendations?.length) {
+        await import("@/lib/prisma").then((prisma) =>
+          prisma.prisma.contentPlan.update({
+            where: { id: previousContentPlan.id },
+            data: {
+              strategy: {
+                ...(previousContentPlan.strategy as object),
+                recommendations: report.recommendations,
+              },
+            },
+          })
+        );
+      }
+
+      // Get owner email for report
+      const owner = await import("@/lib/prisma").then((prisma) =>
+        prisma.prisma.orgMember.findFirst({
+          where: { organizationId, role: "OWNER" },
+          include: { organization: false },
+        })
+      );
+
+      if (owner) {
+        // Get user email from auth
+        const { data: userData } = await import("@/lib/supabase/admin").then((supabase) =>
+          supabase.supabaseAdmin.auth.admin.getUserById(owner.userId)
+        );
+        
+        if (userData?.user?.email) {
+          const { sendWeeklyReportEmail } = await import("@/lib/email");
+          await sendWeeklyReportEmail(
+            userData.user.email,
+            {
+              summary: report.summary,
+              totalImpressions: report.metrics.totalImpressions,
+              totalEngagements: report.metrics.totalEngagements,
+              bestPerformingPlatform: report.metrics.bestPerformingPlatform,
+            },
+            organization.brandConfig.brandName
+          );
+        }
+      }
     }
   } catch (error) {
     console.error(`Failed to generate report for org ${organizationId}:`, error);
