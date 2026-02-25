@@ -40,20 +40,32 @@ export abstract class BaseAgent {
   /**
    * Get the memory query for this agent.
    * Each agent defines what to search for based on its input.
+   * Override to enable memory recall for this agent.
    */
-  abstract getMemoryQuery(input: unknown): string;
+  /* eslint-disable @typescript-eslint/no-unused-vars */
+  getMemoryQuery(input: unknown): string {
+    return "";
+  }
 
   /**
    * Get the relevant memory types for this agent.
    * Each agent defines which memory types matter for its domain.
+   * Override to enable memory recall for this agent.
    */
-  abstract relevantMemoryTypes(): MemoryType[];
+  relevantMemoryTypes(): MemoryType[] {
+    return [];
+  }
 
   /**
    * Store memories after execution.
    * Each agent defines what to remember based on its output.
+   * Override to enable memory storage for this agent.
    */
-  abstract storeMemory(orgId: string, input: unknown, result: AgentResult<unknown>): Promise<void>;
+  /* eslint-disable @typescript-eslint/no-unused-vars */
+  async storeMemory(orgId: string, input: unknown, result: AgentResult<unknown>): Promise<void> {
+    // Default: do nothing - agents must opt-in by overriding
+  }
+  /* eslint-enable @typescript-eslint/no-unused-vars */
 
   /**
    * Format memories for prompt injection.
