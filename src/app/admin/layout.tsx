@@ -10,6 +10,7 @@ import {
   Mail,
   LayoutDashboard,
   Settings as SettingsIcon,
+  AlertTriangle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -19,6 +20,7 @@ const navigation = [
   { name: "Prompts", href: "/admin/prompts", icon: FileText },
   { name: "Feature Flags", href: "/admin/flags", icon: Flag },
   { name: "Safety", href: "/admin/safety", icon: Shield },
+  { name: "Escalations", href: "/admin/escalations", icon: AlertTriangle },
   { name: "Emails", href: "/admin/emails", icon: Mail },
 ];
 

@@ -436,6 +436,53 @@ Identify relevant trends for the brand.`,
   }
   console.log("✓ Email templates seeded");
 
+  // ============================================================
+  // ESCALATION RULES (Global)
+  // ============================================================
+  const escalationRules = [
+    {
+      name: "Crisis Keywords",
+      triggerType: "keyword",
+      triggerValue: "lawsuit,breach,scandal",
+      action: "escalate_critical",
+      priority: "CRITICAL" as const,
+      isEnabled: true,
+    },
+    {
+      name: "Negative Sentiment Spike",
+      triggerType: "sentiment",
+      triggerValue: "-0.7",
+      action: "escalate_high",
+      priority: "HIGH" as const,
+      isEnabled: true,
+    },
+    {
+      name: "High Volume Negative",
+      triggerType: "volume",
+      triggerValue: "10",
+      action: "flag_for_review",
+      priority: "MEDIUM" as const,
+      isEnabled: true,
+    },
+    {
+      name: "Competitor Mention",
+      triggerType: "competitor",
+      triggerValue: "",
+      action: "flag_for_review",
+      priority: "LOW" as const,
+      isEnabled: true,
+    },
+  ];
+
+  for (const rule of escalationRules) {
+    await prisma.escalationRule.upsert({
+      where: { id: (await prisma.escalationRule.findFirst({ where: { name: rule.name } }))?.id || "" },
+      update: rule,
+      create: { ...rule, organizationId: null },
+    });
+  }
+  console.log("✓ Escalation rules seeded");
+
   console.log("\n✅ Seeding complete!");
 }
 
