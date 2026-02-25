@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { PromptTemplateManager } from "./prompt-template-manager";
 import { AgentName } from "@prisma/client";
 
+export const dynamic = 'force-dynamic';
+
 async function getPromptTemplates() {
   return prisma.promptTemplate.findMany({
     orderBy: [{ agentName: "asc" }, { name: "asc" }],

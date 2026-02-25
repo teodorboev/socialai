@@ -3,6 +3,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { FeatureFlagManager } from "./feature-flag-manager";
 
+export const dynamic = 'force-dynamic';
+
 async function getFeatureFlags() {
   return prisma.featureFlag.findMany({
     orderBy: { key: "asc" },

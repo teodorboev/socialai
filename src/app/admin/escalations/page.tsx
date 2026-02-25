@@ -1,6 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import { EscalationRuleManager } from "./escalation-rule-manager";
 
+export const dynamic = 'force-dynamic';
+
 async function getEscalationRules() {
   return prisma.escalationRule.findMany({
     where: { organizationId: null }, // Global rules only

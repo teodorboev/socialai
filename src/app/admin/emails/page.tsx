@@ -1,6 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import { EmailTemplateManager } from "./email-template-manager";
 
+export const dynamic = 'force-dynamic';
+
 async function getEmailTemplates() {
   return prisma.emailTemplate.findMany({
     orderBy: { slug: "asc" },
