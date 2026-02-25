@@ -1,6 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { prisma } from "@/lib/prisma";
-import type { AgentName, AgentLogStatus } from "@prisma/client";
+import { getTrainingContext } from "@/lib/training/prompt-injection";
 
 export interface AgentResult<T> {
   success: boolean;
@@ -11,12 +11,18 @@ export interface AgentResult<T> {
   tokensUsed: number;
 }
 
+export interface AgentInput {
+  organizationId: string;
+  platform?: string;
+  _trainingContext?: string;
+}
+
 export abstract class BaseAgent {
   protected client: Anthropic;
-  protected agentName: AgentName;
+  protected agentName: string;
   protected model: string;
 
-  constructor(agentName: AgentName, model = "claude-sonnet-4-20250514") {
+  constructor(agentName: string, model = "claude-sonnet-4-20250514") {
     this.agentName = agentName;
     this.model = model;
     this.client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! });
@@ -27,8 +33,29 @@ export abstract class BaseAgent {
   async run(organizationId: string, input: unknown): Promise<AgentResult<unknown>> {
     const startTime = Date.now();
 
+    // Get training context for this organization and agent
+    const agentInput = input as AgentInput;
+    const platform = agentInput.platform;
+    
+    let trainingContext = "";
     try {
-      const result = await this.execute(input);
+      trainingContext = await getTrainingContext(
+        organizationId,
+        this.agentName,
+        platform
+      );
+    } catch (error) {
+      console.error("Error getting training context:", error);
+    }
+
+    // Inject training context into the input
+    const enrichedInput = {
+      ...(input as object),
+      _trainingContext: trainingContext,
+    };
+
+    try {
+      const result = await this.execute(enrichedInput);
       const durationMs = Date.now() - startTime;
 
       await this.log(organizationId, {
@@ -73,14 +100,14 @@ export abstract class BaseAgent {
     confidenceScore?: number;
     durationMs: number;
     tokensUsed?: number;
-    status: AgentLogStatus;
+    status: string;
     errorMessage?: string;
   }) {
     try {
       await prisma.agentLog.create({
         data: {
           organizationId,
-          agentName: this.agentName,
+          agentName: this.agentName as any,
           action: data.action,
           inputSummary: data.inputSummary as object,
           outputSummary: data.outputSummary as object,
@@ -88,7 +115,7 @@ export abstract class BaseAgent {
           durationMs: data.durationMs,
           tokensUsed: data.tokensUsed,
           costEstimate: data.tokensUsed ? this.estimateCost(data.tokensUsed) : undefined,
-          status: data.status,
+          status: data.status as any,
           errorMessage: data.errorMessage,
         },
       });
@@ -107,10 +134,10 @@ export abstract class BaseAgent {
       const escalation = await prisma.escalation.create({
         data: {
           organizationId,
-          agentName: this.agentName,
+          agentName: this.agentName as any,
           reason,
           context: context as object,
-          priority,
+          priority: priority as any,
           status: "OPEN",
         },
       });

@@ -1,0 +1,251 @@
+"use client";
+
+import { createClient } from "@/lib/supabase/client";
+import { useState, useEffect, useRef } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Sparkles, Send, Loader2, ArrowLeft, Settings, Zap, Calendar, BarChart3, MessageCircle } from "lucide-react";
+import Link from "next/link";
+
+interface ChatMessage {
+  id: string;
+  role: "user" | "ai";
+  content: string;
+  timestamp: Date;
+}
+
+const SUGGESTED_PROMPTS = [
+  "Post more Reels, they seem to be working",
+  "What's working best right now?",
+  "Stop posting on weekends",
+  "We're launching a new product next month",
+  "Add Glow Recipe as a competitor",
+];
+
+// Tool definitions for the AI
+const AVAILABLE_TOOLS = [
+  { name: "update_posting_schedule", description: "Change posting times/frequency" },
+  { name: "update_content_mix", description: "Change content type ratios" },
+  { name: "update_brand_voice", description: "Adjust tone, vocabulary, style" },
+  { name: "add_competitor", description: "Start tracking a new competitor" },
+  { name: "create_content_request", description: "Request specific content" },
+  { name: "create_campaign", description: "Build a content campaign for an event/launch" },
+  { name: "get_analytics", description: "Pull performance data" },
+  { name: "get_competitor_report", description: "Get competitor intelligence" },
+  { name: "update_automation_level", description: "Change human involvement level" },
+  { name: "update_do_nots", description: "Add/remove content restrictions" },
+  { name: "explain_decision", description: "Explain why the AI made a specific choice" },
+  { name: "get_recommendations", description: "Get AI's suggestions for improvement" },
+  { name: "pause_publishing", description: "Pause all scheduled content" },
+  { name: "resume_publishing", description: "Resume publishing" },
+];
+
+export default function AskAIPage() {
+  const [loading, setLoading] = useState(false);
+  const [messages, setMessages] = useState<ChatMessage[]>([
+    {
+      id: "1",
+      role: "ai",
+      content: "Hi! I'm your AI social media manager. You can ask me anything—change your posting schedule, check what's working, request content, or just chat. What would you like to do?",
+      timestamp: new Date(),
+    },
+  ]);
+  const [input, setInput] = useState("");
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
+
+  function scrollToBottom() {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }
+
+  async function handleSend() {
+    if (!input.trim()) return;
+
+    const userMessage: ChatMessage = {
+      id: Date.now().toString(),
+      role: "user",
+      content: input.trim(),
+      timestamp: new Date(),
+    };
+
+    setMessages(prev => [...prev, userMessage]);
+    setInput("");
+    setLoading(true);
+
+    // Simulate AI response (in production, this would call Claude)
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
+    const aiResponse = generateMockResponse(input.trim());
+    
+    const aiMessage: ChatMessage = {
+      id: (Date.now() + 1).toString(),
+      role: "ai",
+      content: aiResponse,
+      timestamp: new Date(),
+    };
+
+    setMessages(prev => [...prev, aiMessage]);
+    setLoading(false);
+  }
+
+  function generateMockResponse(userInput: string): string {
+    const lower = userInput.toLowerCase();
+    
+    if (lower.includes("reel") || lower.includes("video")) {
+      return "Agreed—your Reels are getting 3.2x more reach than static posts. I've updated the content mix to include 3 Reels per week instead of 1. You'll see the first new ones in tomorrow's review batch.";
+    }
+    
+    if (lower.includes("weekend")) {
+      return "Done. I've removed Saturday and Sunday from your posting schedule. Your weekday content will be redistributed. Note: your audience is actually 15% more active on Sundays—want me to keep Sundays and just remove Saturdays?";
+    }
+    
+    if (lower.includes("working") || lower.includes("best") || lower.includes("performance")) {
+      return "Your top performers this month are ingredient spotlight carousels (avg 5.1% engagement) and skincare routine Reels (avg 4.8%). Product-only posts are your weakest at 1.9%. I've been shifting the mix toward educational content because of this.";
+    }
+    
+    if (lower.includes("launch") || lower.includes("product")) {
+      return "Exciting! Tell me about the product and the launch date, and I'll build a pre-launch, launch, and post-launch content campaign for it. What should I know about the product?";
+    }
+    
+    if (lower.includes("competitor")) {
+      return "I can start tracking Glow Recipe. I'll monitor their content, posting frequency, and engagement. Want me to also set up alerts for their major campaigns?";
+    }
+    
+    // Default response
+    return "Got it! I've noted that down. Is there anything else you'd like me to adjust, or would you like to know how your social media is performing?";
+  }
+
+  function handleSuggestedPrompt(prompt: string) {
+    setInput(prompt);
+  }
+
+  return (
+    <div className="max-w-2xl mx-auto">
+      {/* Header */}
+      <div className="flex items-center gap-4 mb-6">
+        <Link href="/mission-control">
+          <Button variant="ghost" size="sm">
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back
+          </Button>
+        </Link>
+        <h1 className="text-2xl font-bold text-white flex items-center gap-2">
+          <MessageCircle className="h-6 w-6 text-blue-400" />
+          Talk to your AI
+        </h1>
+      </div>
+
+      {/* Chat */}
+      <Card className="bg-slate-900/50 border-slate-800 h-[500px] flex flex-col">
+        <CardContent className="flex-1 overflow-y-auto p-4 space-y-4">
+          {messages.map((msg) => (
+            <div
+              key={msg.id}
+              className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+            >
+              <div className={`flex gap-3 max-w-[85%] ${msg.role === "user" ? "flex-row-reverse" : ""}`}>
+                <Avatar className="h-8 w-8">
+                  <AvatarFallback className={msg.role === "ai" ? "bg-blue-500" : "bg-green-500"}>
+                    {msg.role === "ai" ? "AI" : "You"}
+                  </AvatarFallback>
+                </Avatar>
+                <div
+                  className={`rounded-2xl px-4 py-3 ${
+                    msg.role === "ai"
+                      ? "bg-slate-800 border border-slate-700 text-white"
+                      : "bg-blue-600 text-white"
+                  }`}
+                >
+                  <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                  <p className="text-xs opacity-50 mt-1">
+                    {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </p>
+                </div>
+              </div>
+            </div>
+          ))}
+          {loading && (
+            <div className="flex justify-start">
+              <div className="flex gap-3">
+                <Avatar className="h-8 w-8">
+                  <AvatarFallback className="bg-blue-500">AI</AvatarFallback>
+                </Avatar>
+                <div className="rounded-2xl px-4 py-3 bg-slate-800 border border-slate-700">
+                  <Loader2 className="h-5 w-5 animate-spin text-blue-400" />
+                </div>
+              </div>
+            </div>
+          )}
+          <div ref={messagesEndRef} />
+        </CardContent>
+
+        {/* Suggested prompts */}
+        {messages.length <= 2 && (
+          <div className="px-4 pb-2">
+            <p className="text-slate-400 text-sm mb-2">Try asking:</p>
+            <div className="flex flex-wrap gap-2">
+              {SUGGESTED_PROMPTS.map((prompt, i) => (
+                <Button
+                  key={i}
+                  variant="outline"
+                  size="sm"
+                  className="border-slate-700 text-slate-300 text-xs"
+                  onClick={() => handleSuggestedPrompt(prompt)}
+                >
+                  {prompt}
+                </Button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Input */}
+        <div className="p-4 border-t border-slate-800">
+          <div className="flex gap-2">
+            <Input
+              placeholder="Type a message..."
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleSend()}
+              className="bg-slate-800 border-slate-700 text-white"
+              disabled={loading}
+            />
+            <Button onClick={handleSend} disabled={loading || !input.trim()}>
+              {loading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Send className="h-4 w-4" />
+              )}
+            </Button>
+          </div>
+        </div>
+      </Card>
+
+      {/* Available tools hint */}
+      <Card className="mt-4 bg-slate-900/30 border-slate-800">
+        <CardContent className="py-3">
+          <p className="text-slate-400 text-xs mb-2">I can help you with:</p>
+          <div className="flex flex-wrap gap-2">
+            <span className="text-xs text-slate-500 flex items-center gap-1">
+              <Calendar className="h-3 w-3" /> Scheduling
+            </span>
+            <span className="text-xs text-slate-500 flex items-center gap-1">
+              <BarChart3 className="h-3 w-3" /> Analytics
+            </span>
+            <span className="text-xs text-slate-500 flex items-center gap-1">
+              <Zap className="h-3 w-3" /> Content
+            </span>
+            <span className="text-xs text-slate-500 flex items-center gap-1">
+              <Settings className="h-3 w-3" /> Settings
+            </span>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}

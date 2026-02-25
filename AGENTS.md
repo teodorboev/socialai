@@ -15,6 +15,13 @@ Skills contain agent-specific architecture, schemas, prompts, and checklists. Re
 
 | When building... | Read these skills (in order) |
 |-----------------|------------------------------|
+| **ANY UI or dashboard work** | **`ai-first-ux` FIRST — this overrides all UI assumptions** |
+| Onboarding flow | `ai-first-ux` → `onboarding-intelligence` |
+| Mission Control dashboard | `ai-first-ux` |
+| "Talk to AI" command interface | `ai-first-ux` |
+| Content review / approval UI | `ai-first-ux` → `predictive-content` |
+| Notification system | `ai-first-ux` |
+| Crisis mode UI | `ai-first-ux` → `crisis-response` |
 | Any new AI agent | `base-agent` → `[specific agent]` |
 | Content generation pipeline | `base-agent` → `content-creator` → `hashtag-optimizer` → `visual` → `compliance` → `publisher` |
 | Comment/DM auto-responses | `base-agent` → `engagement` |

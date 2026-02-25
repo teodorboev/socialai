@@ -9,7 +9,10 @@ CRITICAL: Read these files before ANY implementation:
 
 ## Skills Directory
 
-Read the relevant skill from `.claude/skills/` before implementing any agent:
+Read the relevant skill from `.claude/skills/` before implementing any feature:
+
+**⚡ READ FIRST — Defines the entire UX:**
+- `.claude/skills/ai-first-ux/SKILL.md` — THE master UX skill. AI-guided onboarding + mission control dashboard. No menus. No settings pages. AI runs everything. Human monitors. **This overrides all UI assumptions in every other skill.**
 
 **Core Agents:**
 - `.claude/skills/base-agent/SKILL.md` — READ FIRST for any agent work

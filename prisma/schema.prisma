@@ -42,6 +42,11 @@ model Organization {
   competitors        Competitor[]
   influencerCandidates InfluencerCandidate[]
   audienceProfiles   AudienceProfile[]
+  
+  // AI Training
+  aiFeedback        AIFeedback[]
+  aiPreferences     AIPreference[]
+  aiExemplars       AIExemplar[]
 
   @@map("organizations")
 }
@@ -478,6 +483,11 @@ model OrgSettings {
   organizationId              String   @unique @map("organization_id") @db.Uuid
   organization                Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
+  // Automation level (from ai-first-ux skill)
+  automationLevel             String   @default("light_touch") @map("automation_level") // "autonomous", "light_touch", "hands_on"
+  reviewWindowHours           Int      @default(24) @map("review_window_hours")
+  autoPublishOnNoReview       Boolean  @default(false) @map("auto_publish_on_no_review")
+
   // Confidence thresholds
   autoPublishThreshold        Float    @default(0.90) @map("auto_publish_threshold")
   flagForReviewThreshold      Float    @default(0.75) @map("flag_for_review_threshold")
@@ -496,6 +506,20 @@ model OrgSettings {
   // Content limits
   maxPostsPerDayPerPlatform   Int      @default(3) @map("max_posts_per_day_per_platform")
   contentBufferDays           Int      @default(2) @map("content_buffer_days")
+
+  // Onboarding extracted data (from ai-first-ux)
+  postingSchedule             Json?    @map("posting_schedule")
+  contentMix                  Json?    @map("content_mix")
+  brandVoice                  Json?    @map("brand_voice")
+  competitors                 Json?    
+  doNots                      String[] @default([]) @map("do_nots")
+  goals                       String[] @default([]) 
+  targetAudience              Json?    @map("target_audience")
+  connectedPlatforms          String[] @default([]) @map("connected_platforms")
+
+  // AI-managed strategy
+  currentStrategy             Json?    @map("current_strategy")
+  lastStrategyUpdate          DateTime? @map("last_strategy_update")
 
   // General
   timezone                    String   @default("UTC")
@@ -786,4 +810,66 @@ model AudienceProfile {
 
   @@index([organizationId, analyzedAt])
   @@map("audience_profiles")
+}
+
+// ============================================================
+// AI TRAINING MODE
+// ============================================================
+
+model AIFeedback {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId  String   @map("organization_id") @db.Uuid
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  contentId       String?  @map("content_id") @db.Uuid
+  agentName       AgentName @map("agent_name")
+  feedbackType    String   @map("feedback_type") // "thumbs", "star", "correction", "rejection"
+  rating          Int?     // 1-5 for stars, 1=thumbs up 0=thumbs down
+  originalOutput  String?  @db.Text @map("original_output")
+  correctedOutput String?  @db.Text @map("corrected_output")
+  rejectionReason String?  @map("rejection_reason") // "off_brand", "too_long", "wrong_tone", "factual_error", "not_relevant", "bad_timing"
+  notes           String?  @db.Text
+  userId          String   @map("user_id") @db.Uuid
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@index([organizationId, agentName])
+  @@index([organizationId, feedbackType])
+  @@index([organizationId, createdAt])
+  @@map("ai_feedback")
+}
+
+model AIPreference {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId  String   @map("organization_id") @db.Uuid
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId          String?  @map("user_id") @db.Uuid
+  agentName       AgentName? @map("agent_name")
+  platform        Platform?
+  rule            String
+  ruleType        String   @map("rule_type") // "always", "never", "prefer", "avoid"
+  isActive        Boolean  @default(true) @map("is_active")
+  source          String   // "explicit" (user typed it), "learned" (derived from feedback patterns)
+  confidence      Float    @default(1.0) // 1.0 for explicit rules, lower for learned
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@index([organizationId, agentName])
+  @@map("ai_preferences")
+}
+
+model AIExemplar {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId  String   @map("organization_id") @db.Uuid
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId          String?  @map("user_id") @db.Uuid
+  agentName       AgentName @map("agent_name")
+  platform        Platform?
+  contentType     String?  @map("content_type")
+  content         String   @db.Text
+  context         String?  @db.Text // Why this is good
+  rating          Int      @default(5) // How strongly to weight this exemplar
+  source          String   // "bookmarked" (user saved), "top_performer" (auto-detected), "correction" (from corrected output)
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@index([organizationId, agentName])
+  @@map("ai_exemplars")
 }
