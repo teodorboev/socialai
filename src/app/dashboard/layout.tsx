@@ -29,6 +29,9 @@ import {
   Search,
   Globe,
   UserPlus,
+  DollarSign,
+  UsersRound,
+  Newspaper,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -38,10 +41,13 @@ const navigation = [
   { name: "Review", href: "/dashboard/review", icon: CheckSquare },
   { name: "Engagement", href: "/dashboard/engagement", icon: MessageCircle },
   { name: "Analytics", href: "/dashboard/analytics", icon: BarChart3 },
+  { name: "ROI", href: "/dashboard/roi", icon: DollarSign },
   { name: "Accounts", href: "/dashboard/accounts", icon: Users },
   { name: "Brand", href: "/dashboard/brand", icon: Palette },
   { name: "Competitors", href: "/dashboard/competitors", icon: Search },
   { name: "Influencers", href: "/dashboard/influencers", icon: UserPlus },
+  { name: "Community", href: "/dashboard/community", icon: UsersRound },
+  { name: "PR & Media", href: "/dashboard/pr", icon: Newspaper },
   { name: "Localization", href: "/dashboard/localization", icon: Globe },
   { name: "Listening", href: "/dashboard/listening", icon: Search },
   { name: "Escalations", href: "/dashboard/escalations", icon: AlertTriangle },
