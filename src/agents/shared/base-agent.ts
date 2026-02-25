@@ -1,6 +1,12 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { prisma } from "@/lib/prisma";
 import { getTrainingContext } from "@/lib/training/prompt-injection";
+import { 
+  memory, 
+  formatMemoriesForPrompt, 
+  type MemoryType, 
+  type MemoryResult 
+} from "@/lib/memory";
 
 export interface AgentResult<T> {
   success: boolean;
@@ -15,6 +21,7 @@ export interface AgentInput {
   organizationId: string;
   platform?: string;
   _trainingContext?: string;
+  _memoryContext?: string;
 }
 
 export abstract class BaseAgent {
@@ -29,6 +36,32 @@ export abstract class BaseAgent {
   }
 
   abstract execute(input: unknown): Promise<AgentResult<unknown>>;
+
+  /**
+   * Get the memory query for this agent.
+   * Each agent defines what to search for based on its input.
+   */
+  abstract getMemoryQuery(input: unknown): string;
+
+  /**
+   * Get the relevant memory types for this agent.
+   * Each agent defines which memory types matter for its domain.
+   */
+  abstract relevantMemoryTypes(): MemoryType[];
+
+  /**
+   * Store memories after execution.
+   * Each agent defines what to remember based on its output.
+   */
+  abstract storeMemory(orgId: string, input: unknown, result: AgentResult<unknown>): Promise<void>;
+
+  /**
+   * Format memories for prompt injection.
+   * Subclasses can override to customize formatting.
+   */
+  protected formatMemoryContext(memories: MemoryResult[]): string {
+    return formatMemoriesForPrompt(memories);
+  }
 
   async run(organizationId: string, input: unknown): Promise<AgentResult<unknown>> {
     const startTime = Date.now();
@@ -48,10 +81,33 @@ export abstract class BaseAgent {
       console.error("Error getting training context:", error);
     }
 
-    // Inject training context into the input
+    // RECALL: Get relevant memories before execution
+    let memoryContext = "";
+    try {
+      const query = this.getMemoryQuery(input);
+      const memoryTypes = this.relevantMemoryTypes();
+      
+      if (query && memoryTypes.length > 0) {
+        const memories = await memory.recall({
+          organizationId,
+          query,
+          memoryTypes,
+          limit: 10,
+          minSimilarity: 0.7,
+        });
+        
+        memoryContext = this.formatMemoryContext(memories);
+      }
+    } catch (error) {
+      console.error("Error recalling memories:", error);
+      // Continue without memory context on error
+    }
+
+    // Inject contexts into the input
     const enrichedInput = {
       ...(input as object),
       _trainingContext: trainingContext,
+      _memoryContext: memoryContext,
     };
 
     try {
@@ -67,6 +123,14 @@ export abstract class BaseAgent {
         tokensUsed: result.tokensUsed,
         status: result.shouldEscalate ? "ESCALATED" : "SUCCESS",
       });
+
+      // STORE: Save execution result as memory
+      try {
+        await this.storeMemory(organizationId, input, result);
+      } catch (error) {
+        console.error("Error storing memories:", error);
+        // Don't fail the execution if memory storage fails
+      }
 
       if (result.shouldEscalate) {
         await this.escalate(
