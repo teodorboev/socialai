@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { EngagementResponseSchema, type EngagementResponse } from "@/lib/ai/schemas/engagement";
 import { buildEngagementPrompt, shouldForceEscalate } from "@/lib/ai/prompts/engagement";
 
-interface EngagementInput {
+export interface EngagementInput {
   organizationId: string;
   platform: Platform;
   brandConfig: {
@@ -27,6 +27,10 @@ interface EngagementInput {
     authorUsername: string;
     body: string;
     parentContent?: string;
+  };
+  engagementMetadata?: {
+    authorFollowers?: number;
+    repeatComplaintCount?: number;
   };
   conversationHistory?: Array<{
     role: "brand" | "user";

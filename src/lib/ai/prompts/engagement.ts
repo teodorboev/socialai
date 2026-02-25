@@ -22,6 +22,10 @@ interface EngagementInput {
     body: string;
     parentContent?: string;
   };
+  engagementMetadata?: {
+    authorFollowers?: number;
+    repeatComplaintCount?: number;
+  };
   conversationHistory?: Array<{
     role: "brand" | "user";
     author: string;
@@ -99,19 +103,20 @@ export function shouldForceEscalate(
   output: {
     category: string;
     sentiment: string;
+    inFAQ?: boolean;
   }
 ): { force: boolean; priority: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL"; reason: string } | null {
-  const body = input.engagement.body.toLowerCase();
+  const engagementBody = input.engagement.body.toLowerCase();
 
   // Crisis keywords
   const crisisKeywords = ["lawsuit", "lawyer", "legal action", "sue", "attorney", "court"];
-  if (crisisKeywords.some((k) => body.includes(k))) {
+  if (crisisKeywords.some((k) => engagementBody.includes(k))) {
     return { force: true, priority: "CRITICAL", reason: "Legal language detected" };
   }
 
   // Safety keywords
   const safetyKeywords = ["kill myself", "self-harm", "suicide", "end my life"];
-  if (safetyKeywords.some((k) => body.includes(k))) {
+  if (safetyKeywords.some((k) => engagementBody.includes(k))) {
     return { force: true, priority: "CRITICAL", reason: "Safety concern — do not respond, escalate immediately" };
   }
 
@@ -125,6 +130,37 @@ export function shouldForceEscalate(
 
   if (output.sentiment === "URGENT") {
     return { force: true, priority: "CRITICAL", reason: "Urgent sentiment detected" };
+  }
+
+  // Additional escalation rules based on input metadata
+  const meta = input.engagementMetadata;
+  
+  // Check for complaints with high-follower users
+  if (meta?.authorFollowers && meta.authorFollowers > 1000) {
+    if (output.category === "complaint" || output.sentiment === "NEGATIVE") {
+      return { force: true, priority: "HIGH", reason: "Complaint from high-influence user" };
+    }
+  }
+  
+  // Check for repeat complaints
+  if (meta?.repeatComplaintCount && meta.repeatComplaintCount >= 3) {
+    return { force: true, priority: "HIGH", reason: "Same user has complained 3+ times" };
+  }
+  
+  // Check for money/policy questions not in FAQ
+  const moneyPolicyKeywords = ["refund", "return", "policy", "price", "cost", "billing", "subscription", "cancel"];
+  const involvesMoneyOrPolicy = moneyPolicyKeywords.some(k => engagementBody.includes(k));
+  
+  if (involvesMoneyOrPolicy && !output.inFAQ) {
+    return { force: true, priority: "HIGH", reason: "Money/policy question not in FAQ" };
+  }
+  
+  // Check for personal info requests in DM
+  if (input.engagement.type === "DIRECT_MESSAGE") {
+    const personalInfoKeywords = ["address", "phone number", "email", "password", "credit card", "ssn", "social security"];
+    if (personalInfoKeywords.some(k => engagementBody.includes(k))) {
+      return { force: true, priority: "HIGH", reason: "DM requesting personal info - escalate to security" };
+    }
   }
 
   return null;
