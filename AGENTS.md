@@ -45,6 +45,16 @@ Skills contain agent-specific architecture, schemas, prompts, and checklists. Re
 | Client-ready reports (narrative) | `base-agent` → `reporting-narrator` → `analytics` |
 | New client onboarding | `base-agent` → `onboarding-intelligence` → `strategy` |
 | Client retention / churn prevention | `churn-prediction` → `reporting-narrator` |
+| Revenue attribution (is social making money?) | `base-agent` → `roi-attribution` → `analytics` |
+| Content performance prediction | `base-agent` → `predictive-content` → `analytics` |
+| Brand voice consistency | `base-agent` → `brand-voice-guardian` |
+| Social search optimization | `base-agent` → `social-seo` → `hashtag-optimizer` |
+| Deep brand perception / sentiment | `base-agent` → `sentiment-intelligence` → `social-listening` |
+| Multi-touch customer journey | `base-agent` → `cross-channel-attribution` → `roi-attribution` |
+| Competitor pricing / promotions | `base-agent` → `pricing-intelligence` → `competitor-intelligence` |
+| Community management & super fans | `base-agent` → `community-builder` → `ugc-curator` |
+| PR / earned media from social traction | `base-agent` → `media-pitch` → `social-listening` |
+| Competitor paid ad monitoring | `base-agent` → `competitive-ad-intelligence` → `ad-copy` |
 
 ## Tech Stack (Non-Negotiable)
 

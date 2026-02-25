@@ -52,4 +52,20 @@ Read the relevant skill from `.claude/skills/` before implementing any agent:
 - `.claude/skills/review-response/SKILL.md` — Google/Yelp/Facebook review responses
 - `.claude/skills/reporting-narrator/SKILL.md` — Client-ready narrative performance reports
 
+**Revenue & Attribution Agents:**
+- `.claude/skills/roi-attribution/SKILL.md` — Social → revenue attribution with GA4/Shopify/CRM
+- `.claude/skills/cross-channel-attribution/SKILL.md` — Multi-touch customer journey mapping
+- `.claude/skills/pricing-intelligence/SKILL.md` — Competitor pricing & promotion monitoring
+
+**Advanced Intelligence Agents:**
+- `.claude/skills/predictive-content/SKILL.md` — Pre-publish performance prediction
+- `.claude/skills/brand-voice-guardian/SKILL.md` — Voice consistency scoring & drift detection
+- `.claude/skills/social-seo/SKILL.md` — Social platform search optimization
+- `.claude/skills/sentiment-intelligence/SKILL.md` — Deep brand perception modeling
+- `.claude/skills/competitive-ad-intelligence/SKILL.md` — Competitor paid ad monitoring
+
+**Growth Agents:**
+- `.claude/skills/community-builder/SKILL.md` — Super fan nurturing & community rituals
+- `.claude/skills/media-pitch/SKILL.md` — Earned media opportunity detection & PR pitches
+
 All rules from AGENTS.md apply here. The user never runs terminal commands.
