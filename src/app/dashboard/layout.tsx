@@ -32,6 +32,11 @@ import {
   DollarSign,
   UsersRound,
   Newspaper,
+  TrendingUp,
+  Target,
+  FileSearch,
+  Megaphone,
+  Copy,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -50,6 +55,11 @@ const navigation = [
   { name: "PR & Media", href: "/dashboard/pr", icon: Newspaper },
   { name: "Localization", href: "/dashboard/localization", icon: Globe },
   { name: "Listening", href: "/dashboard/listening", icon: Search },
+  { name: "Trends", href: "/dashboard/trends", icon: TrendingUp },
+  { name: "Audience", href: "/dashboard/audience", icon: Target },
+  { name: "SEO", href: "/dashboard/seo", icon: FileSearch },
+  { name: "Ad Copy", href: "/dashboard/ad-copy", icon: Megaphone },
+  { name: "Repurpose", href: "/dashboard/repurpose", icon: Copy },
   { name: "Escalations", href: "/dashboard/escalations", icon: AlertTriangle },
   { name: "Settings", href: "/dashboard/settings", icon: Settings },
 ];

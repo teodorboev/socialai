@@ -55,6 +55,9 @@ Skills contain agent-specific architecture, schemas, prompts, and checklists. Re
 | Community management & super fans | `base-agent` → `community-builder` → `ugc-curator` |
 | PR / earned media from social traction | `base-agent` → `media-pitch` → `social-listening` |
 | Competitor paid ad monitoring | `base-agent` → `competitive-ad-intelligence` → `ad-copy` |
+| Client stakeholder dashboard (viewer) | `client-viewer-dashboard` |
+| AI learning / feedback system | `ai-training-mode` → `base-agent` |
+| Dashboard internationalization | `multi-language-dashboard` |
 
 ## Tech Stack (Non-Negotiable)
 

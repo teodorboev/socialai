@@ -68,4 +68,9 @@ Read the relevant skill from `.claude/skills/` before implementing any agent:
 - `.claude/skills/community-builder/SKILL.md` — Super fan nurturing & community rituals
 - `.claude/skills/media-pitch/SKILL.md` — Earned media opportunity detection & PR pitches
 
+**Platform Features:**
+- `.claude/skills/client-viewer-dashboard/SKILL.md` — Read-only branded dashboard for client stakeholders
+- `.claude/skills/ai-training-mode/SKILL.md` — Per-org AI learning from feedback, corrections, preferences
+- `.claude/skills/multi-language-dashboard/SKILL.md` — Full i18n: 10 languages, RTL support, DB overrides
+
 All rules from AGENTS.md apply here. The user never runs terminal commands.
