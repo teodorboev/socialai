@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { OnboardingIntelligenceAgent } from "@/agents/onboarding-intelligence";
 import { prisma } from "@/lib/prisma";
+import { createGoal, proposeGoalTargets } from "@/lib/goals/tracker";
+import type { GoalType } from "@/lib/goals/tracker";
 
 export async function POST(request: NextRequest) {
   try {
@@ -100,6 +102,27 @@ export async function POST(request: NextRequest) {
     };
 
     const result = await agent.run(organizationId, agentInput);
+
+    // Create goals based on user's stated objectives
+    if (goals && goals.length > 0) {
+      try {
+        for (const goalType of goals) {
+          // Propose smart targets based on historical data
+          const targets = await proposeGoalTargets(organizationId, goalType as GoalType);
+          
+          // Create the goal
+          await createGoal(
+            organizationId,
+            goalType as GoalType,
+            `Goal: ${goalType.replace(/_/g, " ")}`,
+            targets
+          );
+        }
+      } catch (goalError) {
+        console.error("Error creating goals:", goalError);
+        // Don't fail onboarding if goal creation fails
+      }
+    }
 
     // Return a summary of the onboarding intelligence
     const intelligence = result.data as any;

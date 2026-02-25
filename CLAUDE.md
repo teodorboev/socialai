@@ -83,4 +83,7 @@ Read the relevant skill from `.claude/skills/` before implementing any feature:
 - `.claude/skills/goal-tracking/SKILL.md` — Tracks progress toward client goals. Auto-adjusts strategy when falling behind.
 - `.claude/skills/inter-client-learning/SKILL.md` — Anonymized cross-client patterns. Network effect — platform gets smarter with every client.
 
+**Billing & Infrastructure:**
+- `.claude/skills/billing/SKILL.md` — Complete Stripe integration: multi-currency, plan management from admin UI, entitlements, dunning, webhooks. Controls which agents each plan can use via Orchestrator.
+
 All rules from AGENTS.md apply here. The user never runs terminal commands.
