@@ -24,6 +24,13 @@ interface DashboardData {
   accounts: number;
   activityData: { date: string; created: number; published: number }[];
   platformData: { platform: string; followers: number }[];
+  goalSummary: {
+    total: number;
+    onTrack: number;
+    atRisk: number;
+    offTrack: number;
+    primaryGoal: { type: string; progress: number; onTrack: boolean } | null;
+  } | null;
 }
 
 export default function DashboardPage() {
@@ -132,6 +139,44 @@ export default function DashboardPage() {
           followers: (a.metadata as any)?.followers || Math.floor(Math.random() * 5000) + 1000,
         })) || [];
 
+      // Get goal summary
+      let goalSummary = null;
+      try {
+        const { data: goalsData } = await supabase
+          .from("goals")
+          .select("id, type, priority, current_progress")
+          .eq("organization_id", orgId)
+          .eq("is_active", true)
+          .order("priority", { ascending: true })
+          .limit(5);
+
+        if (goalsData && goalsData.length > 0) {
+          const onTrack = goalsData.filter((g: any) => 
+            g.current_progress?.onTrack === true
+          ).length;
+          const atRisk = goalsData.filter((g: any) => 
+            g.current_progress && g.current_progress.onTrack !== true && g.current_progress.percentComplete >= 50
+          ).length;
+          const offTrack = goalsData.filter((g: any) => 
+            g.current_progress && g.current_progress.percentComplete < 50
+          ).length;
+
+          goalSummary = {
+            total: goalsData.length,
+            onTrack,
+            atRisk,
+            offTrack,
+            primaryGoal: goalsData[0] ? {
+              type: goalsData[0].type,
+              progress: goalsData[0].current_progress?.percentComplete || 0,
+              onTrack: goalsData[0].current_progress?.onTrack || true,
+            } : null,
+          };
+        }
+      } catch (e) {
+        console.error("Error fetching goals:", e);
+      }
+
       setData({
         contentCount: contentCount || 0,
         pendingReview: pendingReview || 0,
@@ -139,6 +184,7 @@ export default function DashboardPage() {
         accounts: accounts || 0,
         activityData,
         platformData,
+        goalSummary,
       });
       setLoading(false);
     }
@@ -214,6 +260,33 @@ export default function DashboardPage() {
             <p className="text-xs text-muted-foreground">Social platforms</p>
           </CardContent>
         </Card>
+        {data?.goalSummary && (
+          <Card className={data.goalSummary.offTrack > 0 ? "border-red-500" : data.goalSummary.atRisk > 0 ? "border-yellow-500" : "border-green-500"}>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Goal Progress</CardTitle>
+              <TrendingUp className={`h-4 w-4 ${data.goalSummary.offTrack > 0 ? "text-red-500" : data.goalSummary.atRisk > 0 ? "text-yellow-500" : "text-green-500"}`} />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {data.goalSummary.onTrack}/{data.goalSummary.total}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {data.goalSummary.primaryGoal ? (
+                  <>
+                    Primary: {data.goalSummary.primaryGoal.type.replace(/_/g, " ")} ({Math.round(data.goalSummary.primaryGoal.progress)}%)
+                  </>
+                ) : (
+                  "No active goals"
+                )}
+              </p>
+              {data.goalSummary.offTrack > 0 && (
+                <p className="text-xs text-red-500 mt-1">
+                  {data.goalSummary.offTrack} goal(s) need attention
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
