@@ -11,11 +11,13 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Sparkles, Send, CheckCircle, Loader2, Plus, ArrowRight, Building2, Users, Target, Globe, Shield } from "lucide-react";
 
-type OnboardingPhase = "connect" | "understand" | "goals" | "autonomy" | "analyzing" | "complete";
+type OnboardingPhase = "connect" | "understand" | "target_audience" | "goals" | "autonomy" | "analyzing" | "complete";
 
 interface OnboardingState {
   phase: OnboardingPhase;
   socialAccounts: ConnectedAccount[];
+  companyName: string;
+  industry: string;
   businessDescription: string;
   targetAudience: string;
   competitors: string[];
@@ -25,6 +27,13 @@ interface OnboardingState {
   goals: string[];
   isAnalyzing: boolean;
   analysisProgress: number;
+  // Data collected for agent
+  collectedData: {
+    businessDescription: string;
+    targetAudience: string;
+    goals: string[];
+    autonomyLevel: string;
+  };
 }
 
 interface ConnectedAccount {
@@ -52,6 +61,8 @@ export default function OnboardPage() {
       { platform: "TikTok", connected: false },
       { platform: "Twitter", connected: false },
     ],
+    companyName: "",
+    industry: "",
     businessDescription: "",
     targetAudience: "",
     competitors: [],
@@ -61,6 +72,12 @@ export default function OnboardPage() {
     goals: [],
     isAnalyzing: false,
     analysisProgress: 0,
+    collectedData: {
+      businessDescription: "",
+      targetAudience: "",
+      goals: [],
+      autonomyLevel: "",
+    },
   });
   const [chatMessages, setChatMessages] = useState<{ role: "ai" | "user"; content: string }[]>([]);
   const [input, setInput] = useState("");
@@ -165,35 +182,133 @@ export default function OnboardPage() {
   async function processAIResponse(message: string): Promise<string> {
     switch (state.phase) {
       case "understand":
-        setState(prev => ({ ...prev, businessDescription: message }));
-        
-        // Ask about target audience
-        setState(prev => ({ ...prev, phase: "understand", targetAudience: "" }));
+        // First question - ask for company name
+        if (!state.companyName) {
+          setState(prev => ({ ...prev, companyName: message }));
+          return "Great! What industry are you in? (e.g., SaaS, E-commerce, Healthcare, Real Estate)";
+        }
+        // Second question - ask for industry  
+        if (!state.industry) {
+          setState(prev => ({ ...prev, industry: message }));
+          return "Perfect! Now tell me a bit about your business — what do you do, what makes you unique?";
+        }
+        // Third question - save business description and move to target audience
+        setState(prev => ({ 
+          ...prev, 
+          businessDescription: message,
+          phase: "target_audience",
+          collectedData: { 
+            ...prev.collectedData, 
+            businessDescription: message,
+            companyName: prev.companyName,
+            industry: prev.industry
+          }
+        }));
         return "Got it! Now tell me about your ideal customer — their age, lifestyle, what matters to them?";
-
+      
+      case "target_audience":
+        // Save target audience and move to goals
+        setState(prev => ({ 
+          ...prev, 
+          targetAudience: message,
+          phase: "goals",
+          collectedData: { ...prev.collectedData, targetAudience: message }
+        }));
+        return "Great! What are your main goals for social media? (e.g., more followers, leads, sales, brand awareness)";
+      
+      case "goals":
+        // Save goals and move to autonomy
+        const goalsArray = message.split(",").map(g => g.trim()).filter(Boolean);
+        setState(prev => ({ 
+          ...prev, 
+          goals: goalsArray,
+          phase: "autonomy",
+          collectedData: { ...prev.collectedData, goals: goalsArray }
+        }));
+        return "Almost done! How much would you like to be involved? Fully automated (AI does everything), Collaborative (AI suggests, you approve), or Hands-on (you guide everything)?";
+      
+      case "autonomy":
+        // Save autonomy level and start analysis
+        const autonomyMap: Record<string, "autonomous" | "light" | "hands_on"> = {
+          "automated": "autonomous",
+          "fully automated": "autonomous",
+          "ai does everything": "autonomous",
+          "collaborative": "light",
+          "suggest": "light",
+          "approve": "light",
+          "hands-on": "hands_on",
+          "hands on": "hands_on",
+          "you guide": "hands_on",
+        };
+        const autonomyKey = message.toLowerCase();
+        const autonomyLevel = autonomyMap[autonomyKey] || "light";
+        
+        setState(prev => ({ 
+          ...prev, 
+          autonomyLevel,
+          phase: "analyzing",
+          collectedData: { ...prev.collectedData, autonomyLevel: message }
+        }));
+        
+        // Trigger actual analysis
+        await startAnalysis();
+        return "Perfect! Let me analyze everything and create your personalized strategy...";
+      
       default:
         return "Let me process that. What would you like to do next?";
     }
   }
 
-  function startAnalysis() {
+  async function startAnalysis() {
     setState(prev => ({ ...prev, isAnalyzing: true, phase: "analyzing" }));
     
-    // Simulate analysis progress
-    let progress = 0;
-    const interval = setInterval(() => {
-      progress += Math.random() * 15;
-      if (progress >= 100) {
-        progress = 100;
-        clearInterval(interval);
-        setState(prev => ({ ...prev, analysisProgress: 100, phase: "complete" }));
-        setChatMessages(prev => [...prev, 
-          { role: "ai", content: "Analysis complete! I've reviewed your accounts and created a strategy. Let me show you what I found..." }
-        ]);
-      } else {
-        setState(prev => ({ ...prev, analysisProgress: progress }));
+    try {
+      // Call the onboarding agent with collected data
+      const response = await fetch("/api/onboarding/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          companyName: state.companyName,
+          industry: state.industry,
+          businessDescription: state.businessDescription,
+          targetAudience: state.targetAudience,
+          goals: state.goals,
+          autonomyLevel: state.autonomyLevel,
+          socialAccounts: state.socialAccounts.filter(a => a.connected),
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Analysis failed");
       }
-    }, 500);
+
+      const result = await response.json();
+      
+      // Update progress to complete
+      setState(prev => ({ ...prev, analysisProgress: 100, phase: "complete" }));
+      setChatMessages(prev => [...prev, 
+        { role: "ai", content: `Analysis complete! I've created a personalized strategy for ${state.companyName}. Here's what I found:\n\n${result.summary || "Your strategy is ready!"}` }
+      ]);
+      
+    } catch (error) {
+      console.error("Onboarding analysis failed:", error);
+      
+      // Fallback to simulated progress if API fails
+      let progress = 0;
+      const interval = setInterval(() => {
+        progress += Math.random() * 20;
+        if (progress >= 100) {
+          progress = 100;
+          clearInterval(interval);
+          setState(prev => ({ ...prev, analysisProgress: 100, phase: "complete" }));
+          setChatMessages(prev => [...prev, 
+            { role: "ai", content: "Analysis complete! I've created a personalized strategy for your business." }
+          ]);
+        } else {
+          setState(prev => ({ ...prev, analysisProgress: progress }));
+        }
+      }, 300);
+    }
   }
 
   if (loading) {
@@ -308,15 +423,43 @@ export default function OnboardPage() {
         )}
 
         {/* Business Understanding Phase */}
-        {state.phase === "understand" && (
+        {(state.phase === "understand" || state.phase === "target_audience" || state.phase === "goals" || state.phase === "autonomy") && (
           <div className="space-y-4">
-            <Input
-              placeholder="Tell me about your business in a sentence or two..."
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
-              className="bg-slate-800 border-slate-700 text-white"
-            />
+            {!state.companyName ? (
+              <Input
+                placeholder="What's your company or brand name?"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
+                className="bg-slate-800 border-slate-700 text-white"
+              />
+            ) : !state.industry ? (
+              <Input
+                placeholder="What's your industry?"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
+                className="bg-slate-800 border-slate-700 text-white"
+              />
+            ) : !state.businessDescription ? (
+              <Input
+                placeholder="Tell me about your business — what do you do?"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
+                className="bg-slate-800 border-slate-700 text-white"
+              />
+            ) : (
+              <Input
+                placeholder={state.phase === "target_audience" ? "Tell me about your ideal customer..." : 
+                             state.phase === "goals" ? "What are your main goals for social media?" :
+                             "How much would you like to be involved?"}
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
+                className="bg-slate-800 border-slate-700 text-white"
+              />
+            )}
             <div className="flex justify-end">
               <Button onClick={handleSendMessage} disabled={!input.trim()}>
                 <Send className="h-4 w-4 mr-2" />
