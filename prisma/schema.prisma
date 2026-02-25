@@ -70,6 +70,9 @@ model Organization {
   postMortems       PostMortem[]
   agentScorecards    AgentScorecard[]
   dnaProfiles       DNAProfile[]
+  
+  // Goal Tracking
+  goals             Goal[]
 
   @@map("organizations")
 }
@@ -1457,6 +1460,90 @@ model DNAProfile {
   
   @@unique([organizationId, platform])
   @@map("dna_profiles")
+}
+
+// ============================================================
+// GOAL TRACKING
+// ============================================================
+
+model Goal {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId  String    @map("organization_id") @db.Uuid
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  
+  type            GoalType
+  description     String    @db.Text
+  isActive        Boolean   @default(true) @map("is_active")
+  priority        Int       @default(1) // 1 = primary goal
+  
+  // Targets (set by AI based on historical data + industry benchmarks)
+  targets         Json      // GoalTargets object
+  currentProgress Json?     @map("current_progress") // Latest progress snapshot
+  adjustments     Json?     @map("adjustments") // Strategy adjustments made
+  
+  // Timeline
+  startDate       DateTime  @default(now()) @map("start_date")
+  targetDate      DateTime? @map("target_date")
+  achievedAt      DateTime? @map("achieved_at")
+  
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+  
+  checkpoints     GoalCheckpoint[]
+  
+  @@index([organizationId, isActive])
+  @@map("goals")
+}
+
+model GoalCheckpoint {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  goalId          String   @map("goal_id") @db.Uuid
+  goal            Goal     @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  
+  periodStart     DateTime @map("period_start")
+  periodEnd       DateTime @map("period_end")
+  
+  // Target values for this period
+  targetValue     Float    @map("target_value")
+  targetUnit      String   @map("target_unit") // "percent", "count", "currency"
+  
+  // Actual values achieved
+  actualValue     Float?   @map("actual_value")
+  
+  // Progress calculation
+  progressPercent Float?   @map("progress_percent")
+  onTrack         Boolean? @map("on_track")
+  
+  // Status
+  status          CheckpointStatus @default(PENDING)
+  notes           String?  @db.Text
+  
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+  
+  @@index([goalId, periodStart])
+  @@map("goal_checkpoints")
+}
+
+enum GoalType {
+  grow_followers
+  drive_website_traffic
+  drive_sales
+  increase_engagement
+  build_awareness
+  generate_leads
+  launch_product
+  build_community
+  improve_brand_perception
+  custom
+}
+
+enum CheckpointStatus {
+  PENDING
+  IN_PROGRESS
+  ACHIEVED
+  MISSED
+  ADJUSTED
 }
 
 // ============================================================
