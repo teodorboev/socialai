@@ -475,11 +475,12 @@ Identify relevant trends for the brand.`,
   ];
 
   for (const rule of escalationRules) {
-    await prisma.escalationRule.upsert({
-      where: { id: (await prisma.escalationRule.findFirst({ where: { name: rule.name } }))?.id || "" },
-      update: rule,
-      create: { ...rule, organizationId: null },
-    });
+    const existing = await prisma.escalationRule.findFirst({ where: { name: rule.name } });
+    if (!existing) {
+      await prisma.escalationRule.create({
+        data: { ...rule, organizationId: null },
+      });
+    }
   }
   console.log("✓ Escalation rules seeded");
 
