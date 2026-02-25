@@ -16,17 +16,35 @@ Skills contain agent-specific architecture, schemas, prompts, and checklists. Re
 | When building... | Read these skills (in order) |
 |-----------------|------------------------------|
 | Any new AI agent | `base-agent` → `[specific agent]` |
-| Content generation pipeline | `base-agent` → `content-creator` → `visual` → `publisher` |
+| Content generation pipeline | `base-agent` → `content-creator` → `hashtag-optimizer` → `visual` → `compliance` → `publisher` |
 | Comment/DM auto-responses | `base-agent` → `engagement` |
-| Monthly content planning | `base-agent` → `strategy` → `analytics` |
+| Monthly content planning | `base-agent` → `strategy` → `analytics` → `audience-intelligence` |
 | Trend monitoring | `base-agent` → `trend-scout` → `content-creator` |
-| Performance reporting | `base-agent` → `analytics` |
+| Performance reporting | `base-agent` → `analytics` → `reporting-narrator` |
 | Content experiments | `base-agent` → `ab-testing` → `analytics` |
-| Publishing to any platform | `social-platform` → `publisher` |
-| Connecting a new social account | `social-platform` |
+| Publishing to any platform | `social-platform` → `compliance` → `publisher` |
+| Connecting a new social account | `social-platform` → `onboarding-intelligence` |
 | Image/video generation | `visual` |
 | Scheduled jobs / cron functions | `orchestrator` |
-| The overall system coordination | `orchestrator` |
+| The overall system coordination | `orchestrator` → `content-replenishment` |
+| Competitor monitoring | `base-agent` → `competitor-intelligence` |
+| Content repurposing / multiplication | `base-agent` → `repurpose` → `content-creator` |
+| Brand monitoring / social listening | `base-agent` → `social-listening` → `crisis-response` |
+| Audience personas / insights | `base-agent` → `audience-intelligence` → `analytics` |
+| Influencer discovery | `base-agent` → `influencer-scout` |
+| Pipeline reliability / never go dark | `content-replenishment` → `orchestrator` |
+| Regulatory / brand compliance | `base-agent` → `compliance` |
+| Multi-market / multi-language content | `base-agent` → `localization` → `compliance` → `visual` |
+| Hashtag strategy | `base-agent` → `hashtag-optimizer` → `content-creator` |
+| Rewriting underperformers | `base-agent` → `caption-rewriter` → `analytics` |
+| Crisis management | `base-agent` → `crisis-response` → `social-listening` → `engagement` |
+| User-generated content pipeline | `base-agent` → `ugc-curator` → `engagement` → `compliance` |
+| Review management (Google, Yelp, etc.) | `base-agent` → `review-response` |
+| Paid social ad creation | `base-agent` → `ad-copy` → `audience-intelligence` → `compliance` |
+| Calendar optimization | `base-agent` → `calendar-optimizer` → `audience-intelligence` |
+| Client-ready reports (narrative) | `base-agent` → `reporting-narrator` → `analytics` |
+| New client onboarding | `base-agent` → `onboarding-intelligence` → `strategy` |
+| Client retention / churn prevention | `churn-prediction` → `reporting-narrator` |
 
 ## Tech Stack (Non-Negotiable)
 

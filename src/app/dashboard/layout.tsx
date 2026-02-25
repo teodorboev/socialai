@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -10,6 +10,9 @@ import {
   SheetContent,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import {
+  RealtimeNotifications,
+} from "@/components/dashboard/realtime-notifications";
 import {
   LayoutDashboard,
   FileText,
@@ -47,6 +50,26 @@ export default function DashboardLayout({
   const router = useRouter();
   const supabase = createClient();
   const [open, setOpen] = useState(false);
+  const [orgId, setOrgId] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function getOrgId() {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (user) {
+        const { data: orgMember } = await supabase
+          .from("org_members")
+          .select("organization_id")
+          .eq("user_id", user.id)
+          .single();
+        if (orgMember) {
+          setOrgId(orgMember.organization_id);
+        }
+      }
+    }
+    getOrgId();
+  }, [supabase]);
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
@@ -84,6 +107,13 @@ export default function DashboardLayout({
 
       {/* Main content */}
       <div className="lg:pl-72">
+        {/* Header */}
+        <header className="sticky top-0 z-40 flex h-16 items-center gap-4 border-b bg-white px-4 sm:px-6 lg:px-8">
+          <div className="flex flex-1 items-center justify-end gap-4">
+            {orgId && <RealtimeNotifications organizationId={orgId} />}
+          </div>
+        </header>
+        
         <main className="py-8 px-4 sm:px-6 lg:px-8">{children}</main>
       </div>
     </div>

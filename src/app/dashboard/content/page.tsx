@@ -2,10 +2,12 @@ import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { ContentGenerator } from "@/components/dashboard/content-generator";
 import { ScheduleContent } from "@/components/dashboard/schedule-content";
+import { ContentCalendar } from "@/components/dashboard/content-calendar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { FileText, Clock, CheckCircle, AlertCircle, XCircle } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { FileText, Clock, CheckCircle, AlertCircle, XCircle, Calendar as CalendarIcon, List } from "lucide-react";
 
 export default async function ContentPage() {
   const supabase = await createClient();
@@ -40,7 +42,7 @@ export default async function ContentPage() {
     `)
     .eq("organization_id", orgId)
     .order("created_at", { ascending: false })
-    .limit(20);
+    .limit(50);
 
   // Get brand config status
   const { data: brandConfig } = await supabase
@@ -100,60 +102,77 @@ export default async function ContentPage() {
         </div>
       )}
 
-      <div className="space-y-4">
-        <h2 className="text-xl font-semibold">Recent Content</h2>
-        {content && content.length > 0 ? (
-          <div className="space-y-2">
-            {content.map((item: any) => {
-              const StatusIcon = statusIcons[item.status] || FileText;
-              const schedule = item.schedules?.[0];
-              return (
-                <Card key={item.id}>
-                  <CardContent className="p-4">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-2">
-                          <Badge className={statusColors[item.status] || "bg-gray-500"}>
-                            {item.status.replace("_", " ")}
-                          </Badge>
-                          <Badge variant="outline">{item.platform}</Badge>
-                          <Badge variant="secondary">{item.content_type}</Badge>
+      <Tabs defaultValue="list" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="list" className="gap-2">
+            <List className="h-4 w-4" />
+            List View
+          </TabsTrigger>
+          <TabsTrigger value="calendar" className="gap-2">
+            <CalendarIcon className="h-4 w-4" />
+            Calendar View
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="list" className="space-y-4">
+          <h2 className="text-xl font-semibold">Recent Content</h2>
+          {content && content.length > 0 ? (
+            <div className="space-y-2">
+              {content.map((item: any) => {
+                const StatusIcon = statusIcons[item.status] || FileText;
+                const schedule = item.schedules?.[0];
+                return (
+                  <Card key={item.id}>
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-2">
+                            <Badge className={statusColors[item.status] || "bg-gray-500"}>
+                              {item.status.replace("_", " ")}
+                            </Badge>
+                            <Badge variant="outline">{item.platform}</Badge>
+                            <Badge variant="secondary">{item.content_type}</Badge>
+                          </div>
+                          <p className="text-sm line-clamp-2">{item.caption}</p>
+                          <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
+                            {item.hashtags && item.hashtags.length > 0 && (
+                              <span>{item.hashtags.length} hashtags</span>
+                            )}
+                            <span>Confidence: {Math.round(item.confidence_score * 100)}%</span>
+                            {schedule && (
+                              <span className="text-purple-600">
+                                Scheduled: {new Date(schedule.scheduled_for).toLocaleString()}
+                              </span>
+                            )}
+                          </div>
                         </div>
-                        <p className="text-sm line-clamp-2">{item.caption}</p>
-                        <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
-                          {item.hashtags && item.hashtags.length > 0 && (
-                            <span>{item.hashtags.length} hashtags</span>
-                          )}
-                          <span>Confidence: {Math.round(item.confidence_score * 100)}%</span>
-                          {schedule && (
-                            <span className="text-purple-600">
-                              Scheduled: {new Date(schedule.scheduled_for).toLocaleString()}
-                            </span>
-                          )}
+                        <div className="flex flex-col items-end gap-2">
+                          <StatusIcon className="h-5 w-5 text-muted-foreground" />
+                          <span className="text-xs text-muted-foreground">
+                            {new Date(item.created_at).toLocaleDateString()}
+                          </span>
+                          <ScheduleContent content={item} />
                         </div>
                       </div>
-                      <div className="flex flex-col items-end gap-2">
-                        <StatusIcon className="h-5 w-5 text-muted-foreground" />
-                        <span className="text-xs text-muted-foreground">
-                          {new Date(item.created_at).toLocaleDateString()}
-                        </span>
-                        <ScheduleContent content={item} />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
-        ) : (
-          <Card>
-            <CardContent className="p-8 text-center text-muted-foreground">
-              <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p>No content yet. Generate your first post above!</p>
-            </CardContent>
-          </Card>
-        )}
-      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          ) : (
+            <Card>
+              <CardContent className="p-8 text-center text-muted-foreground">
+                <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p>No content yet. Generate your first post above!</p>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        <TabsContent value="calendar">
+          <ContentCalendar initialContent={content || []} />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
