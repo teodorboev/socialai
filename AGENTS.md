@@ -65,6 +65,11 @@ Skills contain agent-specific architecture, schemas, prompts, and checklists. Re
 | Client stakeholder dashboard (viewer) | `client-viewer-dashboard` |
 | AI learning / feedback system | `ai-training-mode` → `base-agent` |
 | Dashboard internationalization | `multi-language-dashboard` |
+| Shared memory / agent context | `shared-memory` → modify `base-agent` to recall/store |
+| Post-mortem / self-evaluation | `self-evaluation` → `shared-memory` → `content-dna` |
+| Content DNA profiling | `content-dna` → `self-evaluation` → `shared-memory` |
+| Goal tracking & auto-adjustment | `goal-tracking` → `ai-first-ux` |
+| Cross-client intelligence | `inter-client-learning` → `content-dna` → `shared-memory` |
 
 ## Tech Stack (Non-Negotiable)
 

@@ -76,4 +76,11 @@ Read the relevant skill from `.claude/skills/` before implementing any feature:
 - `.claude/skills/ai-training-mode/SKILL.md` — Per-org AI learning from feedback, corrections, preferences
 - `.claude/skills/multi-language-dashboard/SKILL.md` — Full i18n: 10 languages, RTL support, DB overrides
 
+**Intelligence Systems (READ THESE — they make every agent smarter):**
+- `.claude/skills/shared-memory/SKILL.md` — pgvector memory layer: every agent recalls before executing, stores after. The collective brain.
+- `.claude/skills/self-evaluation/SKILL.md` — Post-mortem on every published post: predicted vs actual. Feeds learnings back to all agents.
+- `.claude/skills/content-dna/SKILL.md` — Fingerprints winning content DNA. New content is engineered to match proven formulas.
+- `.claude/skills/goal-tracking/SKILL.md` — Tracks progress toward client goals. Auto-adjusts strategy when falling behind.
+- `.claude/skills/inter-client-learning/SKILL.md` — Anonymized cross-client patterns. Network effect — platform gets smarter with every client.
+
 All rules from AGENTS.md apply here. The user never runs terminal commands.

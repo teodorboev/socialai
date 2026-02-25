@@ -4,6 +4,7 @@
  */
 
 import { prisma } from "@/lib/prisma";
+import sharp from "sharp";
 
 interface BrandIdentityData {
   organizationId: string;
@@ -229,28 +230,193 @@ export function getBrandCssVariables(brand: VisualBrandIdentity): Record<string,
 
 /**
  * Apply brand colors to image (post-processing)
- * Note: This would use sharp to apply color grading
+ * Uses sharp to apply color grading based on brand mood
  */
 export async function applyBrandColorGrading(
-  _imageBuffer: Buffer,
-  _brand: VisualBrandIdentity
+  imageBuffer: Buffer,
+  brand: VisualBrandIdentity
 ): Promise<Buffer> {
-  // TODO: Implement with sharp
-  // - Adjust color temperature (warm/cool based on brand mood)
-  // - Saturation levels
-  // - Contrast
-  // - Slight color tint toward brand palette
-  throw new Error("Not implemented - requires sharp");
+  const b = brand as Record<string, unknown>;
+  const photoMood = (b.photoMood as string)?.toLowerCase() || "";
+  
+  // Determine color temperature based on mood
+  let temperature = 0; // Neutral
+  let saturation = 1;
+  let brightness = 0;
+
+  // Warm moods = positive temperature, Cool moods = negative
+  const warmMoods = ["warm", "cozy", "inviting", "friendly", "energetic", "passionate"];
+  const coolMoods = ["cool", "calm", "professional", "clean", "minimal", "serene"];
+
+  if (warmMoods.some(m => photoMood.includes(m))) {
+    temperature = 15; // Warmer
+    saturation = 1.1;
+  } else if (coolMoods.some(m => photoMood.includes(m))) {
+    temperature = -15; // Cooler
+    saturation = 0.95;
+  }
+
+  // Apply color grading
+  let pipeline = sharp(imageBuffer);
+
+  // Get dominant color from brand and apply tint
+  const primaryColor = (b.primaryColor as string) || "#000000";
+  const accentColor = (b.accentColor as string) || "#808080";
+
+  // Convert hex to RGB for color adjustments
+  const primaryRgb = hexToRgb(primaryColor);
+  const accentRgb = hexToRgb(accentColor);
+
+  // Apply brightness and saturation adjustments
+  if (brightness !== 0) {
+    pipeline = pipeline.modulate({ brightness: 1 + brightness / 100 });
+  }
+  if (saturation !== 1) {
+    pipeline = pipeline.modulate({ saturation });
+  }
+  // Note: temperature is not directly supported in sharp, would need complex processing
+
+  // Apply a subtle color tint toward brand primary color
+  if (primaryRgb) {
+    pipeline = pipeline.tint({
+      r: Math.round(255 - (255 - primaryRgb.r) * 0.1),
+      g: Math.round(255 - (255 - primaryRgb.g) * 0.1),
+      b: Math.round(255 - (255 - primaryRgb.b) * 0.1),
+    });
+  }
+
+  // Sharpen for professional look
+  pipeline = pipeline.sharpen({ sigma: 0.5 });
+
+  return pipeline.png().toBuffer();
 }
 
 /**
  * Apply brand watermark to image
  */
 export async function applyBrandWatermark(
-  _imageBuffer: Buffer,
-  _brand: VisualBrandIdentity
+  imageBuffer: Buffer,
+  brand: VisualBrandIdentity,
+  options?: {
+    position?: "bottom-right" | "bottom-left" | "top-right" | "top-left" | "center";
+    opacity?: number;
+    scale?: number;
+  }
 ): Promise<Buffer> {
-  // TODO: Implement with sharp
-  // - Subtle logo in corner with opacity
-  throw new Error("Not implemented - requires sharp");
+  const b = brand as Record<string, unknown>;
+  const logoUrl = b.logoUrl as string | undefined;
+  
+  if (!logoUrl) {
+    // No logo, return original
+    return imageBuffer;
+  }
+
+  const position = options?.position || "bottom-right";
+  const opacity = options?.opacity || 0.3;
+  const scale = options?.scale || 0.15;
+
+  try {
+    // Download logo
+    const logoResponse = await fetch(logoUrl);
+    const logoBuffer = Buffer.from(await logoResponse.arrayBuffer());
+
+    // Get image metadata
+    const image = sharp(imageBuffer);
+    const metadata = await image.metadata();
+    const width = metadata.width || 1080;
+    const height = metadata.height || 1080;
+
+    // Calculate logo size (default 15% of image width)
+    const logoWidth = Math.round(width * scale);
+    
+    // Resize logo
+    const resizedLogo = await sharp(logoBuffer)
+      .resize(logoWidth)
+      .ensureAlpha()
+      .composite([{
+        input: Buffer.from([255, 255, 255, Math.round(opacity * 255)]),
+        raw: { width: 1, height: 1, channels: 4 },
+        tile: true,
+        blend: "dest-in",
+      }])
+      .toBuffer();
+
+    // Calculate position
+    const padding = 20;
+    let left = width - logoWidth - padding;
+    let top = height - (logoWidth * 0.3) - padding; // Assume logo is ~30% aspect ratio
+
+    switch (position) {
+      case "bottom-left":
+        left = padding;
+        break;
+      case "top-right":
+        top = padding;
+        break;
+      case "top-left":
+        left = padding;
+        top = padding;
+        break;
+      case "center":
+        left = Math.round((width - logoWidth) / 2);
+        top = Math.round((height - logoWidth * 0.3) / 2);
+        break;
+    }
+
+    // Composite logo onto image
+    return sharp(imageBuffer)
+      .composite([{
+        input: resizedLogo,
+        left: Math.max(0, left),
+        top: Math.max(0, top),
+      }])
+      .png()
+      .toBuffer();
+  } catch (error) {
+    console.error("Failed to apply watermark:", error);
+    // Return original if watermark fails
+    return imageBuffer;
+  }
+}
+
+/**
+ * Convert hex color to RGB
+ */
+function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  return result ? {
+    r: parseInt(result[1], 16),
+    g: parseInt(result[2], 16),
+    b: parseInt(result[3], 16),
+  } : null;
+}
+
+/**
+ * Process image with brand styling
+ * Combines color grading and watermark
+ */
+export async function applyBrandStyling(
+  imageBuffer: Buffer,
+  brand: VisualBrandIdentity,
+  options?: {
+    applyColorGrading?: boolean;
+    applyWatermark?: boolean;
+    watermarkPosition?: "bottom-right" | "bottom-left" | "top-right" | "top-left" | "center";
+    watermarkOpacity?: number;
+  }
+): Promise<Buffer> {
+  let processed = imageBuffer;
+
+  if (options?.applyColorGrading !== false) {
+    processed = await applyBrandColorGrading(processed, brand);
+  }
+
+  if (options?.applyWatermark !== false) {
+    processed = await applyBrandWatermark(processed, brand, {
+      position: options?.watermarkPosition,
+      opacity: options?.watermarkOpacity,
+    });
+  }
+
+  return processed;
 }
