@@ -53,6 +53,15 @@ model Organization {
   brandAssets       BrandAsset[]
   generatedVisuals GeneratedVisual[]
 
+  // New relations for new models
+  complianceRules    ComplianceRule[]
+  complianceChecks   ComplianceCheck[]
+  pipelineRuns       PipelineRun[]
+  activityLogs       ActivityLog[]
+  attentionItems     AttentionItem[]
+  onboardingReport   OnboardingReport?
+  circuitBreakers    CircuitBreaker[]
+
   @@map("organizations")
 }
 
@@ -961,6 +970,280 @@ model BrandAsset {
   @@index([organizationId, type])
   @@index([organizationId, tags])
   @@map("brand_assets")
+}
+
+// ============================================================
+// COMPLIANCE
+// ============================================================
+
+model ComplianceRule {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId  String?  @map("organization_id") @db.Uuid
+  organization    Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  category        String   // "ftc_disclosure", "health_claims", "financial_advice", etc.
+  rule            String   @db.Text
+  severity        ComplianceSeverity @default(WARN)
+  appliesTo       String[] @default(["all"]) @map("applies_to") // ["all", "health", "finance"]
+  industry        String?  // Optional industry-specific override
+  isEnabled       Boolean  @default(true) @map("is_enabled")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@unique([organizationId, category, rule])
+  @@index([organizationId, isEnabled])
+  @@map("compliance_rules")
+}
+
+enum ComplianceSeverity {
+  BLOCK
+  WARN
+  INFO
+}
+
+model ComplianceCheck {
+  id              String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId  String             @map("organization_id") @db.Uuid
+  organization    Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  contentId       String?            @map("content_id") @db.Uuid
+  agentName       AgentName          @map("agent_name")
+  category        String
+  status          ComplianceStatus   @default(PENDING)
+  detail          String?            @db.Text
+  suggestedFix    String?            @map("suggested_fix") @db.Text
+  riskLevel       RiskLevel          @default(CLEAR) @map("risk_level")
+  requiredDisclosures String[]       @default([]) @map("required_disclosures")
+  revisedContent  String?            @map("revised_content") @db.Text
+  confidenceScore Float              @default(0) @map("confidence_score")
+  checkedAt       DateTime           @default(now()) @map("checked_at")
+
+  @@index([organizationId, contentId])
+  @@index([organizationId, status])
+  @@map("compliance_checks")
+}
+
+enum ComplianceStatus {
+  PENDING
+  PASSED
+  FAILED
+  WARNED
+  FIXED
+}
+
+enum RiskLevel {
+  CLEAR
+  LOW
+  MEDIUM
+  HIGH
+  BLOCKED
+}
+
+// ============================================================
+// ORCHESTRATOR - PIPELINE RUNS
+// ============================================================
+
+model PipelineRun {
+  id              String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId  String?          @map("organization_id") @db.Uuid
+  organization    Organization?    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  pipeline        String           // "content_pipeline", "engagement_monitor", "analytics_snapshot", etc.
+  status          PipelineStatus   @default(RUNNING)
+  trigger         String           @map("trigger") // "cron", "manual", "event", "webhook"
+  startedAt       DateTime         @default(now()) @map("started_at")
+  completedAt     DateTime?        @map("completed_at")
+  durationMs      Int?             @map("duration_ms")
+  steps           Json?            // Array of step results { step: "content_creator", status: "success", duration: 1200 }
+  errorMessage    String?          @map("error_message")
+  itemsProcessed  Int              @default(0) @map("items_processed")
+  tokensUsed      Int              @default(0) @map("tokens_used")
+  costEstimate    Float            @default(0) @map("cost_estimate")
+
+  @@index([organizationId, pipeline, startedAt])
+  @@index([status, startedAt])
+  @@map("pipeline_runs")
+}
+
+enum PipelineStatus {
+  RUNNING
+  SUCCESS
+  FAILED
+  PARTIAL
+  CANCELLED
+}
+
+// ============================================================
+// ACTIVITY LOG (Human-readable Mission Control)
+// ============================================================
+
+model ActivityLog {
+  id              String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId  String        @map("organization_id") @db.Uuid
+  organization    Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  type            ActivityType
+  agentName       AgentName?
+  action          String
+  description     String        @db.Text
+  referenceType   String?       @map("reference_type") // "content", "engagement", "schedule", etc.
+  referenceId    String?       @map("reference_id") @db.Uuid
+  metadata        Json?
+  icon            String?       // Icon name for UI
+  color           String?       // Color for UI badge
+  createdAt       DateTime      @default(now()) @map("created_at")
+
+  @@index([organizationId, type, createdAt])
+  @@index([organizationId, createdAt])
+  @@map("activity_logs")
+}
+
+enum ActivityType {
+  CONTENT_CREATED
+  CONTENT_PUBLISHED
+  CONTENT_APPROVED
+  CONTENT_REJECTED
+  CONTENT_SCHEDULED
+  ENGAGEMENT_REPLIED
+  ENGAGEMENT_ESCALATED
+  ANALYTICS_UPDATED
+  STRATEGY_GENERATED
+  TREND_DETECTED
+  ONBOARDING_COMPLETED
+  ACCOUNT_CONNECTED
+  ACCOUNT_DISCONNECTED
+  SETTINGS_CHANGED
+  USER_INVITED
+  USER_REMOVED
+  ESCALATION_RESOLVED
+  ERROR_RECOVERED
+  SYSTEM_ALERT
+}
+
+// ============================================================
+// ATTENTION ITEMS (Human attention items)
+// ============================================================
+
+model AttentionItem {
+  id              String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId  String            @map("organization_id") @db.Uuid
+  organization    Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  type            AttentionType
+  title           String
+  description     String            @db.Text
+  priority        AttentionPriority @default(MEDIUM)
+  status          AttentionStatus   @default(OPEN)
+  referenceType   String?           @map("reference_type")
+  referenceId    String?           @map("reference_id") @db.Uuid
+  actionUrl      String?           @map("action_url")
+  createdBy       String?           @map("created_by") @db.Uuid
+  resolvedBy      String?           @map("resolved_by") @db.Uuid
+  resolvedAt      DateTime?         @map("resolved_at")
+  snoozedUntil    DateTime?         @map("snoozed_until")
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+
+  @@index([organizationId, status, priority])
+  @@index([organizationId, type])
+  @@map("attention_items")
+}
+
+enum AttentionType {
+  REVIEW_REQUIRED
+  APPROVAL_PENDING
+  ESCALATION
+  ERROR
+  WARNING
+  OPPORTUNITY
+  SYSTEM_ALERT
+}
+
+enum AttentionPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum AttentionStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  DISMISSED
+  SNOOZED
+}
+
+// ============================================================
+// CIRCUIT BREAKER (Agent failure tracking)
+// ============================================================
+
+model CircuitBreaker {
+  id              String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId  String?          @map("organization_id") @db.Uuid
+  organization    Organization?    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  agentName       AgentName        @map("agent_name")
+  state           CircuitState     @default(CLOSED)
+  failureCount    Int              @default(0) @map("failure_count")
+  successCount    Int              @default(0) @map("success_count")
+  lastFailureAt   DateTime?        @map("last_failure_at")
+  lastSuccessAt   DateTime?        @map("last_success_at")
+  lastFailureMsg  String?          @map("last_failure_msg")
+  openedAt        DateTime?        @map("opened_at")
+  closedAt        DateTime?        @map("closed_at")
+  cooldownUntil   DateTime?        @map("cooldown_until")
+  threshold       Int              @default(3) // failures before opening
+  cooldownMinutes Int              @default(30) @map("cooldown_minutes")
+  createdAt       DateTime         @default(now()) @map("created_at")
+  updatedAt       DateTime         @updatedAt @map("updated_at")
+
+  @@unique([organizationId, agentName])
+  @@index([state])
+  @@map("circuit_breakers")
+}
+
+enum CircuitState {
+  CLOSED
+  OPEN
+  HALF_OPEN
+}
+
+// ============================================================
+// ONBOARDING REPORT (Onboarding analysis results)
+// ============================================================
+
+model OnboardingReport {
+  id              String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId  String              @unique @map("organization_id") @db.Uuid
+  organization    Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  
+  // Analysis results
+  brandVoice      Json?               @map("brand_voice")
+  targetAudience  Json?               @map("target_audience")
+  contentStrategy Json?               @map("content_strategy")
+  platformStrategy Json?              @map("platform_strategy")
+  competitors     Json?               
+  recommendedActions Json?            @map("recommended_actions")
+  
+  // Analysis metadata
+  analyzedAt      DateTime            @default(now()) @map("analyzed_at")
+  sourcesAnalyzed Json?               @map("sources_analyzed") // { posts: 150, comments: 500, etc }
+  confidenceScore Float               @default(0) @map("confidence_score")
+  
+  // Status
+  status          OnboardingStatus    @default(PENDING)
+  completedAt     DateTime?           @map("completed_at")
+  
+  // Generated outputs
+  initialContentPlan Json?            @map("initial_content_plan")
+  generatedSettings Json?             @map("generated_settings")
+  
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime            @updatedAt @map("updated_at")
+
+  @@map("onboarding_reports")
+}
+
+enum OnboardingStatus {
+  PENDING
+  ANALYZING
+  COMPLETED
+  FAILED
 }
 
 // ============================================================
