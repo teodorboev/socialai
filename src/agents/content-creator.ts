@@ -68,10 +68,38 @@ export class ContentCreatorAgent extends BaseAgent {
 
   /**
    * STATIC: Brand voice, rules, platform guidelines - cached by Anthropic
-   * This is the bulk of the prompt and changes rarely.
+   * Loads from DB prompt template if available.
    */
-  protected getStaticSystemPrompt(orgContext: OrgContext): string {
+  protected async getStaticSystemPrompt(orgContext: OrgContext): Promise<string> {
     const input = orgContext._input as ContentCreatorInput;
+    
+    // Try to load from DB first
+    try {
+      const variables = {
+        brandName: input?.brandConfig?.brandName || "My Brand",
+        voiceAdjectives: input?.brandConfig?.voiceTone?.adjectives?.join(", ") || "friendly, professional",
+        voiceExamples: input?.brandConfig?.voiceTone?.examples?.join("\n") || "",
+        voiceAvoid: input?.brandConfig?.voiceTone?.avoid?.join("\n") || "",
+        targetDemographics: input?.brandConfig?.targetAudience?.demographics || "",
+        targetInterests: input?.brandConfig?.targetAudience?.interests?.join(", ") || "",
+        targetPainPoints: input?.brandConfig?.targetAudience?.painPoints?.join(", ") || "",
+        contentThemes: input?.brandConfig?.contentThemes?.join(", ") || "",
+        doNots: input?.brandConfig?.doNots?.join("\n") || "",
+        hashtagAlways: input?.brandConfig?.hashtagStrategy?.always?.join(", ") || "",
+        hashtagNever: input?.brandConfig?.hashtagStrategy?.never?.join(", ") || "",
+        hashtagRotating: input?.brandConfig?.hashtagStrategy?.rotating?.join(", ") || "",
+        platform: input?.platform || "Instagram",
+      };
+
+      const dbPrompt = await this.getPromptFromTemplate("main", variables);
+      if (dbPrompt) {
+        return dbPrompt;
+      }
+    } catch (error) {
+      console.warn("Failed to load DB prompt, using fallback:", error);
+    }
+
+    // Fallback to hardcoded prompt if DB fails
     if (!input?.brandConfig) {
       return "You are an expert social media content creator.";
     }
@@ -185,10 +213,13 @@ ${input.dnaContext.recommendedHours.length ? `- Hours: ${input.dnaContext.recomm
 
     try {
       // Use prompt caching with static/dynamic split (Layer 2)
+      const staticPart = await this.getStaticSystemPrompt(orgContext);
+      const dynamicPart = this.getDynamicSystemPromptContext(orgContext);
+      
       const result = await this.callClaude<ContentOutput>({
         system: { 
-          static: this.getStaticSystemPrompt(orgContext), 
-          dynamic: this.getDynamicSystemPromptContext(orgContext) 
+          static: staticPart, 
+          dynamic: dynamicPart 
         },
         userMessage: `Create a new ${input.platform} post. Make it authentic, engaging, and true to the brand voice.`,
         maxTokens: 2000,

@@ -13,6 +13,12 @@ import {
   extractCacheStats,
   type CachableBlock 
 } from "@/lib/caching/prompt-cache";
+import { 
+  getPromptTemplate, 
+  interpolatePrompt,
+  loadPrompt,
+  clearPromptCache 
+} from "@/lib/ai/prompts/loader";
 
 export interface AgentResult<T> {
   success: boolean;
@@ -72,8 +78,9 @@ export abstract class BaseAgent {
    * - Anything that doesn't change between calls
    * 
    * Override to enable prompt caching. Default returns empty string (no caching).
+   * Can be async to load from DB.
    */
-  protected getStaticSystemPrompt(orgContext: OrgContext): string {
+  protected async getStaticSystemPrompt(orgContext: OrgContext): Promise<string> {
     return "";
   }
 
@@ -89,6 +96,21 @@ export abstract class BaseAgent {
   /* eslint-disable @typescript-eslint/no-unused-vars */
   protected getDynamicSystemPromptContext?(orgContext: OrgContext): string | undefined;
   /* eslint-enable @typescript-eslint/no-unused-vars */
+
+  /**
+   * Get prompt template from DB for this agent.
+   * Loads and interpolates variables.
+   * 
+   * @param templateName - The template name (default: "main")
+   * @param variables - Variables to interpolate into the prompt
+   * @returns The interpolated prompt, or throws if not found
+   */
+  protected async getPromptFromTemplate(
+    templateName: string,
+    variables: Record<string, string | number | boolean | undefined>
+  ): Promise<string> {
+    return loadPrompt(this.agentName, templateName, variables);
+  }
 
   /**
    * Build the org context object for prompt building.
@@ -471,9 +493,10 @@ export abstract class BaseAgent {
   /**
    * Build cached system prompt from org context.
    * Convenience method for agents that implement getStaticSystemPrompt.
+   * Can be async if getStaticSystemPrompt is async.
    */
-  protected buildCachedPrompt(orgContext: OrgContext): CachableBlock[] {
-    const staticPart = this.getStaticSystemPrompt(orgContext);
+  protected async buildCachedPrompt(orgContext: OrgContext): Promise<CachableBlock[]> {
+    const staticPart = await this.getStaticSystemPrompt(orgContext);
     const dynamicPart = this.getDynamicSystemPromptContext?.(orgContext);
     return buildCachedSystemPrompt(staticPart, dynamicPart);
   }
