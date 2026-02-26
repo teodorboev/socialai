@@ -5,7 +5,7 @@
  * CRUD operations with Stripe sync.
  */
 
-import { prisma } from "@/lib/prisma";
+import { prismaAdmin } from "@/lib/prisma";
 import { formatPrice, getSupportedCurrencies, getYearlyDiscountPercent } from "@/lib/billing/currency";
 import { Suspense } from "react";
 
@@ -17,7 +17,7 @@ interface PageProps {
 }
 
 async function getPlans() {
-  return prisma.billingPlan.findMany({
+  return prismaAdmin.billingPlan.findMany({
     include: {
       stripePrices: {
         orderBy: [{ currency: "asc" }, { interval: "asc" }],
@@ -32,7 +32,7 @@ async function getPlans() {
 
 async function getMRRByPlan() {
   // Get active subscriptions with their billing plan
-  const subscriptions = await prisma.subscription.findMany({
+  const subscriptions = await prismaAdmin.subscription.findMany({
     where: { status: "active" },
     select: {
       billingPlanId: true,

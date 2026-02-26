@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/prisma";
+import { prismaAdmin } from "@/lib/prisma";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -8,16 +8,16 @@ export const dynamic = 'force-dynamic';
 
 async function getLLMData() {
   const [providers, models, rules] = await Promise.all([
-    prisma.lLMProvider.findMany({
+    prismaAdmin.lLMProvider.findMany({
       orderBy: { sortOrder: "asc" },
     }),
-    prisma.lLMModel.findMany({
+    prismaAdmin.lLMModel.findMany({
       orderBy: { tier: "asc" },
       include: {
         provider: true,
       },
     }),
-    prisma.routingRule.findMany({
+    prismaAdmin.routingRule.findMany({
       orderBy: { priority: "desc" },
     }),
   ]);

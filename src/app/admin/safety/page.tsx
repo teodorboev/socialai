@@ -1,11 +1,11 @@
-import { prisma } from "@/lib/prisma";
+import { prismaAdmin } from "@/lib/prisma";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SafetyConfigManager } from "./safety-config-manager";
 
 export const dynamic = 'force-dynamic';
 
 async function getSafetyConfigs() {
-  return prisma.safetyConfig.findMany({
+  return prismaAdmin.safetyConfig.findMany({
     orderBy: { category: "asc" },
   });
 }

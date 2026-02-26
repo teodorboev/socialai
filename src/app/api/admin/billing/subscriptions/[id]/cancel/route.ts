@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { prismaAdmin } from "@/lib/prisma";
 import { cancelSubscription as cancelStripeSubscription } from "@/lib/billing/stripe";
 
 // POST /api/admin/billing/subscriptions/[id]/cancel - Cancel subscription
@@ -14,7 +14,7 @@ export async function POST(
     const { atPeriodEnd = true, reason } = body;
 
     // Get subscription
-    const subscription = await prisma.subscription.findUnique({
+    const subscription = await prismaAdmin.subscription.findUnique({
       where: { id },
     });
 
@@ -34,7 +34,7 @@ export async function POST(
     }
 
     // Update in database
-    const updated = await prisma.subscription.update({
+    const updated = await prismaAdmin.subscription.update({
       where: { id },
       data: {
         cancelAtPeriodEnd: atPeriodEnd,
@@ -45,7 +45,7 @@ export async function POST(
     });
 
     // Log event
-    await prisma.billingEvent.create({
+    await prismaAdmin.billingEvent.create({
       data: {
         organizationId: subscription.organizationId,
         eventType: "subscription_canceled",

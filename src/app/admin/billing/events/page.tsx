@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/prisma";
+import { prismaAdmin } from "@/lib/prisma";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
@@ -14,7 +14,7 @@ async function getEvents(orgId?: string, eventType?: string) {
   if (orgId) where.organizationId = orgId;
   if (eventType) where.eventType = eventType;
 
-  return prisma.billingEvent.findMany({
+  return prismaAdmin.billingEvent.findMany({
     where,
     include: {
       organization: {
@@ -27,7 +27,7 @@ async function getEvents(orgId?: string, eventType?: string) {
 }
 
 async function getOrganizations() {
-  return prisma.organization.findMany({
+  return prismaAdmin.organization.findMany({
     select: { id: true, name: true },
     orderBy: { name: "asc" },
   });

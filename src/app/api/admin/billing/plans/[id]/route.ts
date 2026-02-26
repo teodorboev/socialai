@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { prismaAdmin } from "@/lib/prisma";
 import { syncPlanToStripe } from "@/lib/billing/stripe";
 
 // GET /api/admin/billing/plans/[id] - Get a single plan
@@ -12,7 +12,7 @@ export async function GET(
   try {
     const { id } = await params;
     
-    const plan = await prisma.billingPlan.findUnique({
+    const plan = await prismaAdmin.billingPlan.findUnique({
       where: { id },
       include: {
         stripePrices: {
@@ -63,13 +63,13 @@ export async function PUT(
     } = body;
 
     // Check if plan exists
-    const existing = await prisma.billingPlan.findUnique({ where: { id } });
+    const existing = await prismaAdmin.billingPlan.findUnique({ where: { id } });
     if (!existing) {
       return NextResponse.json({ error: "Plan not found" }, { status: 404 });
     }
 
     // Update plan
-    const plan = await prisma.billingPlan.update({
+    const plan = await prismaAdmin.billingPlan.update({
       where: { id },
       data: {
         name: name ?? existing.name,
@@ -93,7 +93,7 @@ export async function PUT(
 
     // Try to sync to Stripe (non-blocking)
     try {
-      const planWithPrices = await prisma.billingPlan.findUnique({
+      const planWithPrices = await prismaAdmin.billingPlan.findUnique({
         where: { id: plan.id },
         include: { stripePrices: true },
       });
@@ -119,7 +119,7 @@ export async function DELETE(
     const { id } = await params;
 
     // Check if plan exists
-    const existing = await prisma.billingPlan.findUnique({
+    const existing = await prismaAdmin.billingPlan.findUnique({
       where: { id },
       include: { _count: { select: { subscriptions: true } } },
     });
@@ -131,7 +131,7 @@ export async function DELETE(
     // Check if plan has subscribers - don't delete, just deactivate
     if (existing._count.subscriptions > 0) {
       // Instead of deleting, mark as inactive
-      const plan = await prisma.billingPlan.update({
+      const plan = await prismaAdmin.billingPlan.update({
         where: { id },
         data: { isActive: false },
       });
@@ -142,10 +142,10 @@ export async function DELETE(
     }
 
     // Delete prices first
-    await prisma.stripePlanPrice.deleteMany({ where: { billingPlanId: id } });
+    await prismaAdmin.stripePlanPrice.deleteMany({ where: { billingPlanId: id } });
 
     // Delete plan
-    await prisma.billingPlan.delete({ where: { id } });
+    await prismaAdmin.billingPlan.delete({ where: { id } });
 
     return NextResponse.json({ success: true });
   } catch (error) {

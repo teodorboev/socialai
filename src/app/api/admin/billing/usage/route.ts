@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { prismaAdmin } from "@/lib/prisma";
 
 // GET /api/admin/billing/usage - Get AI usage/costs
 export async function GET(request: Request) {
@@ -31,7 +31,7 @@ export async function GET(request: Request) {
     }
 
     // Get total costs
-    const costAggregation = await prisma.agentCostEvent.aggregate({
+    const costAggregation = await prismaAdmin.agentCostEvent.aggregate({
       where,
       _sum: {
         costCents: true,
@@ -43,7 +43,7 @@ export async function GET(request: Request) {
     });
 
     // Get costs by organization
-    const costsByOrg = await prisma.agentCostEvent.groupBy({
+    const costsByOrg = await prismaAdmin.agentCostEvent.groupBy({
       by: ["organizationId"],
       where,
       _sum: {
@@ -58,7 +58,7 @@ export async function GET(request: Request) {
 
     // Get org names
     const orgIds = costsByOrg.map((c: { organizationId: string }) => c.organizationId);
-    const orgs = await prisma.organization.findMany({
+    const orgs = await prismaAdmin.organization.findMany({
       where: { id: { in: orgIds } },
       select: { id: true, name: true },
     });
@@ -71,7 +71,7 @@ export async function GET(request: Request) {
     }));
 
     // Get costs by agent
-    const costsByAgent = await prisma.agentCostEvent.groupBy({
+    const costsByAgent = await prismaAdmin.agentCostEvent.groupBy({
       by: ["agentName"],
       where,
       _sum: {

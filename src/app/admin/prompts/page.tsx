@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/prisma";
+import { prismaAdmin } from "@/lib/prisma";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -8,7 +8,7 @@ import { AgentName } from "@prisma/client";
 export const dynamic = 'force-dynamic';
 
 async function getPromptTemplates() {
-  return prisma.promptTemplate.findMany({
+  return prismaAdmin.promptTemplate.findMany({
     orderBy: [{ agentName: "asc" }, { name: "asc" }],
   });
 }

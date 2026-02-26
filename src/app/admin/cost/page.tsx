@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/prisma";
+import { prismaAdmin } from "@/lib/prisma";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CostDashboard } from "./cost-dashboard";
 
@@ -12,7 +12,7 @@ async function getCostData() {
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
   // Get daily summaries for last 30 days
-  const dailySummaries = await prisma.dailyCostSummary.findMany({
+  const dailySummaries = await prismaAdmin.dailyCostSummary.findMany({
     where: {
       date: {
         gte: thirtyDaysAgo,
@@ -25,7 +25,7 @@ async function getCostData() {
   });
 
   // Get today's real-time data
-  const todayStats = await prisma.lLMUsageLog.aggregate({
+  const todayStats = await prismaAdmin.lLMUsageLog.aggregate({
     where: {
       createdAt: {
         gte: today,
@@ -43,7 +43,7 @@ async function getCostData() {
   });
 
   // Get tier breakdown for today
-  const tierBreakdown = await prisma.lLMUsageLog.groupBy({
+  const tierBreakdown = await prismaAdmin.lLMUsageLog.groupBy({
     by: ["requestTier"],
     where: {
       createdAt: {
@@ -60,7 +60,7 @@ async function getCostData() {
   });
 
   // Get provider breakdown for today
-  const providerBreakdown = await prisma.lLMUsageLog.groupBy({
+  const providerBreakdown = await prismaAdmin.lLMUsageLog.groupBy({
     by: ["providerName"],
     where: {
       createdAt: {
@@ -77,7 +77,7 @@ async function getCostData() {
   });
 
   // Get agent breakdown for today
-  const agentBreakdown = await prisma.lLMUsageLog.groupBy({
+  const agentBreakdown = await prismaAdmin.lLMUsageLog.groupBy({
     by: ["agentName"],
     where: {
       createdAt: {

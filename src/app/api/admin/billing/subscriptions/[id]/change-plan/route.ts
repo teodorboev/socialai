@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { prismaAdmin } from "@/lib/prisma";
 import { changePlan as changeStripePlan } from "@/lib/billing/stripe";
 
 // POST /api/admin/billing/subscriptions/[id]/change-plan - Change subscription plan
@@ -18,7 +18,7 @@ export async function POST(
     }
 
     // Get current subscription
-    const subscription = await prisma.subscription.findUnique({
+    const subscription = await prismaAdmin.subscription.findUnique({
       where: { id },
       include: {
         billingPlan: true,
@@ -30,7 +30,7 @@ export async function POST(
     }
 
     // Get new plan
-    const newPlan = await prisma.billingPlan.findUnique({
+    const newPlan = await prismaAdmin.billingPlan.findUnique({
       where: { id: newPlanId },
       include: {
         stripePrices: {
@@ -69,7 +69,7 @@ export async function POST(
     }
 
     // Update in database
-    const updated = await prisma.subscription.update({
+    const updated = await prismaAdmin.subscription.update({
       where: { id },
       data: {
         billingPlanId: newPlanId,
@@ -79,7 +79,7 @@ export async function POST(
     });
 
     // Log event
-    await prisma.billingEvent.create({
+    await prismaAdmin.billingEvent.create({
       data: {
         organizationId: subscription.organizationId,
         eventType: "plan_changed",

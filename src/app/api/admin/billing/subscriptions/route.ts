@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { prismaAdmin } from "@/lib/prisma";
 
 // GET /api/admin/billing/subscriptions - List all subscriptions
 // POST /api/admin/billing/subscriptions - Create subscription (manual)
@@ -13,7 +13,7 @@ export async function GET(request: Request) {
     if (status) where.status = status;
     if (orgId) where.organizationId = orgId;
 
-    const subscriptions = await prisma.subscription.findMany({
+    const subscriptions = await prismaAdmin.subscription.findMany({
       where,
       include: {
         organization: {

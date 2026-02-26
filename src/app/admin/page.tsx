@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/prisma";
+import { prismaAdmin } from "@/lib/prisma";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { 
   Server, 
@@ -22,13 +22,13 @@ async function getStats() {
     orgCount,
     memberCount,
   ] = await Promise.all([
-    prisma.platformConfig.count(),
-    prisma.promptTemplate.count(),
-    prisma.featureFlag.count(),
-    prisma.safetyConfig.count(),
-    prisma.emailTemplate.count(),
-    prisma.organization.count(),
-    prisma.orgMember.count(),
+    prismaAdmin.platformConfig.count(),
+    prismaAdmin.promptTemplate.count(),
+    prismaAdmin.featureFlag.count(),
+    prismaAdmin.safetyConfig.count(),
+    prismaAdmin.emailTemplate.count(),
+    prismaAdmin.organization.count(),
+    prismaAdmin.orgMember.count(),
   ]);
 
   return {

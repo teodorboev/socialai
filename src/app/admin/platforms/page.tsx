@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/prisma";
+import { prismaAdmin } from "@/lib/prisma";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -7,7 +7,7 @@ import { PlatformConfigManager } from "./platform-config-manager";
 export const dynamic = 'force-dynamic';
 
 async function getPlatformConfigs() {
-  return prisma.platformConfig.findMany({
+  return prismaAdmin.platformConfig.findMany({
     orderBy: { platform: "asc" },
   });
 }

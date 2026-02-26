@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { prismaAdmin } from "@/lib/prisma";
 import { syncPlanToStripe, syncPriceToStripe } from "@/lib/billing/stripe";
 
 // GET /api/admin/billing/plans - List all plans
 // POST /api/admin/billing/plans - Create a new plan
 export async function GET() {
   try {
-    const plans = await prisma.billingPlan.findMany({
+    const plans = await prismaAdmin.billingPlan.findMany({
       include: {
         stripePrices: {
           orderBy: [{ currency: "asc" }, { interval: "asc" }],
@@ -56,13 +56,13 @@ export async function POST(request: Request) {
     }
 
     // Check if slug already exists
-    const existing = await prisma.billingPlan.findUnique({ where: { slug } });
+    const existing = await prismaAdmin.billingPlan.findUnique({ where: { slug } });
     if (existing) {
       return NextResponse.json({ error: "Plan with this slug already exists" }, { status: 400 });
     }
 
     // Create plan
-    const plan = await prisma.billingPlan.create({
+    const plan = await prismaAdmin.billingPlan.create({
       data: {
         name,
         slug,
@@ -88,7 +88,7 @@ export async function POST(request: Request) {
     // Create prices if provided
     if (prices && prices.length > 0) {
       for (const price of prices) {
-        await prisma.stripePlanPrice.create({
+        await prismaAdmin.stripePlanPrice.create({
           data: {
             billingPlanId: plan.id,
             currency: price.currency,
@@ -104,7 +104,7 @@ export async function POST(request: Request) {
 
     // Try to sync to Stripe (non-blocking)
     try {
-      const planWithPrices = await prisma.billingPlan.findUnique({
+      const planWithPrices = await prismaAdmin.billingPlan.findUnique({
         where: { id: plan.id },
         include: { stripePrices: true },
       });

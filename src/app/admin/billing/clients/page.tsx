@@ -4,7 +4,7 @@
  * Shows MRR, active/trialing/past-due counts, and per-client AI costs.
  */
 
-import { prisma } from "@/lib/prisma";
+import { prismaAdmin } from "@/lib/prisma";
 import { formatPrice, type SupportedCurrency } from "@/lib/billing/currency";
 
 // Force dynamic rendering
@@ -18,15 +18,15 @@ async function getBillingStats() {
     pastDueSubscriptions,
     canceledSubscriptions,
   ] = await Promise.all([
-    prisma.subscription.count(),
-    prisma.subscription.count({ where: { status: "active" } }),
-    prisma.subscription.count({ where: { status: "trialing" } }),
-    prisma.subscription.count({ where: { status: "past_due" } }),
-    prisma.subscription.count({ where: { status: "canceled" } }),
+    prismaAdmin.subscription.count(),
+    prismaAdmin.subscription.count({ where: { status: "active" } }),
+    prismaAdmin.subscription.count({ where: { status: "trialing" } }),
+    prismaAdmin.subscription.count({ where: { status: "past_due" } }),
+    prismaAdmin.subscription.count({ where: { status: "canceled" } }),
   ]);
 
   // Get MRR - use select instead of include to avoid Prisma issues
-  const activeSubs = await prisma.subscription.findMany({
+  const activeSubs = await prismaAdmin.subscription.findMany({
     where: { status: "active" },
     select: {
       billingPlan: {
@@ -59,7 +59,7 @@ async function getBillingStats() {
 
 async function getClientSubscriptions() {
   // Get subscriptions with minimal data first
-  const subs = await prisma.subscription.findMany({
+  const subs = await prismaAdmin.subscription.findMany({
     select: {
       id: true,
       status: true,
@@ -78,7 +78,7 @@ async function getClientSubscriptions() {
 
   // Get all billing plans with their prices in one query
   const planIds = [...new Set(subs.map(s => s.billingPlanId))];
-  const plans = await prisma.billingPlan.findMany({
+  const plans = await prismaAdmin.billingPlan.findMany({
     where: { id: { in: planIds } },
     select: {
       id: true,
@@ -104,7 +104,7 @@ async function getMonthlyCosts(orgId: string) {
   const now = new Date();
   const period = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 
-  const costs = await prisma.agentCostEvent.aggregate({
+  const costs = await prismaAdmin.agentCostEvent.aggregate({
     where: { organizationId: orgId, period },
     _sum: { costCents: true },
   });

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { prismaAdmin } from "@/lib/prisma";
 
 // GET /api/admin/billing/events - List billing events
 export async function GET(request: Request) {
@@ -15,7 +15,7 @@ export async function GET(request: Request) {
     if (eventType) where.eventType = eventType;
 
     const [events, total] = await Promise.all([
-      prisma.billingEvent.findMany({
+      prismaAdmin.billingEvent.findMany({
         where,
         include: {
           organization: {
@@ -26,7 +26,7 @@ export async function GET(request: Request) {
         take: limit,
         skip: offset,
       }),
-      prisma.billingEvent.count({ where }),
+      prismaAdmin.billingEvent.count({ where }),
     ]);
 
     return NextResponse.json({

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { prismaAdmin } from "@/lib/prisma";
 
 // GET /api/admin/billing/subscriptions/[id] - Get single subscription
 // PUT /api/admin/billing/subscriptions/[id] - Update subscription
@@ -10,7 +10,7 @@ export async function GET(
   try {
     const { id } = await params;
 
-    const subscription = await prisma.subscription.findUnique({
+    const subscription = await prismaAdmin.subscription.findUnique({
       where: { id },
       include: {
         organization: {
@@ -48,13 +48,13 @@ export async function PUT(
     const { currentUsage } = body;
 
     // Check if subscription exists
-    const existing = await prisma.subscription.findUnique({ where: { id } });
+    const existing = await prismaAdmin.subscription.findUnique({ where: { id } });
     if (!existing) {
       return NextResponse.json({ error: "Subscription not found" }, { status: 404 });
     }
 
     // Update subscription
-    const subscription = await prisma.subscription.update({
+    const subscription = await prismaAdmin.subscription.update({
       where: { id },
       data: {
         ...(currentUsage !== undefined && { currentUsage }),

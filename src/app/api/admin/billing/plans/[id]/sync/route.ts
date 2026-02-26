@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { prismaAdmin } from "@/lib/prisma";
 import { syncPlanToStripe } from "@/lib/billing/stripe";
 
 // POST /api/admin/billing/plans/[id]/sync - Sync plan to Stripe
@@ -11,7 +11,7 @@ export async function POST(
     const { id } = await params;
 
     // Get plan with prices
-    const plan = await prisma.billingPlan.findUnique({
+    const plan = await prismaAdmin.billingPlan.findUnique({
       where: { id },
       include: { stripePrices: true },
     });

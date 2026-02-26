@@ -6,6 +6,7 @@ const { Pool } = pg;
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
+  adminPrisma: PrismaClient | undefined;
 };
 
 function createPrismaClient() {
@@ -27,6 +28,14 @@ function createPrismaClient() {
   });
 }
 
+// Regular prisma client - uses RLS for regular user queries
 export const prisma = globalForPrisma.prisma ?? createPrismaClient();
 
-if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
+// Admin prisma client - bypasses RLS for system/admin operations
+// This uses the service role which has elevated privileges
+export const prismaAdmin = globalForPrisma.adminPrisma ?? createPrismaClient();
+
+if (process.env.NODE_ENV !== "production") {
+  globalForPrisma.prisma = prisma;
+  globalForPrisma.adminPrisma = prismaAdmin;
+}
