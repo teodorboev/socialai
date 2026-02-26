@@ -2,38 +2,37 @@ import { BaseAgent, type AgentResult, type OrgContext } from "./shared/base-agen
 import { z } from "zod";
 import { AudienceReportSchema, type AudienceIntelInput } from "@/lib/ai/schemas/audience-intelligence";
 import { buildAudienceIntelPrompt } from "@/lib/ai/prompts/audience-intelligence";
+import { loadPrompt } from "@/lib/ai/prompts/loader";
 
 export class AudienceIntelligenceAgent extends BaseAgent {
   constructor() {
     super("AUDIENCE_INTELLIGENCE");
-  }
-
-  protected async getStaticSystemPrompt(orgContext: OrgContext): Promise<string> {
-    const input = orgContext as unknown as AudienceIntelInput;
-
-    try {
-      return await this.getPromptFromTemplate("main", {
-        organizationId: input.organizationId,
-        brandName: input.brandConfig.brandName,
-        industry: input.brandConfig.industry,
-        platformData: JSON.stringify(input.platformData),
-        contentPerformance: JSON.stringify(input.contentPerformance),
-        previousReport: input.previousReport ? JSON.stringify(input.previousReport) : "",
-      });
-    } catch {
-      return `You are an audience intelligence expert. You analyze follower data and create detailed personas. Always respond with valid JSON matching the required schema.`;
-    }
+    this.setTaskType("analysis");
   }
 
   async execute(input: AudienceIntelInput): Promise<AgentResult<z.infer<typeof AudienceReportSchema>>> {
-    const orgContext: OrgContext = input as unknown as OrgContext;
-    const systemPrompt = await this.buildCachedPrompt(orgContext);
+    // Load prompt from DB
+    let systemPrompt: string;
+    try {
+      systemPrompt = await loadPrompt("AUDIENCE_INTELLIGENCE", "main", {
+        organizationId: input.organizationId,
+        brandName: input.brandConfig.brandName,
+        industry: input.brandConfig.industry || "",
+        platformData: JSON.stringify(input.platformData),
+        contentPerformance: JSON.stringify(input.contentPerformance),
+        previousReport: input.previousReport ? JSON.stringify(input.previousReport) : "",
+      }, input.organizationId);
+    } catch {
+      systemPrompt = `You are an audience intelligence expert. You analyze follower data and create detailed personas. Always respond with valid JSON matching the required schema.`;
+    }
+
     const userPrompt = buildAudienceIntelPrompt(input);
 
-    const { text, tokensUsed } = await this.callClaude({
+    const { text, tokensUsed, inputTokens, outputTokens } = await this.callLLM({
       system: systemPrompt,
       userMessage: userPrompt,
       maxTokens: 4000,
+      organizationId: input.organizationId,
     });
 
     if (!text) {
@@ -54,6 +53,8 @@ export class AudienceIntelligenceAgent extends BaseAgent {
         ? `Low confidence or emerging audience shifts detected: ${validated.audienceShifts.filter((s) => s.direction === "emerging").map((s) => s.shift).join(", ")}`
         : undefined,
       tokensUsed,
+      inputTokens,
+      outputTokens,
     };
   }
 
