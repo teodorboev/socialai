@@ -10,7 +10,7 @@ import {
 
 export class OnboardingIntelligenceAgent extends BaseAgent {
   constructor() {
-    super("ONBOARDING_INTELLIGENCE", "claude-sonnet-4-20250514");
+    super("ONBOARDING_INTELLIGENCE");
   }
 
   protected async getStaticSystemPrompt(orgContext: OrgContext): Promise<string> {
@@ -39,44 +39,31 @@ Your role is to design an onboarding plan that sets new clients up for success b
     const parsedInput = OnboardingIntelligenceInputSchema.parse(input);
 
     const orgContext: OrgContext = input as unknown as OrgContext;
-    const systemPrompt = await this.buildCachedPrompt(orgContext);
+    const cachedBlocks = await this.buildCachedPrompt(orgContext);
+    const systemPrompt = cachedBlocks.map(b => b.text).join("\n\n");
 
-    const response = await this.client.messages.create({
-      model: this.model,
-      max_tokens: 3500,
+    const result = await this.callLLM<OnboardingIntelligence>({
       system: systemPrompt,
-      messages: [
-        {
-          role: "user",
-          content: `Create a comprehensive onboarding plan for ${parsedInput.clientInfo.companyName}.`,
-        },
-      ],
+      userMessage: `Create a comprehensive onboarding plan for ${parsedInput.clientInfo.companyName}.`,
+      schema: OnboardingIntelligenceSchema,
+      maxTokens: 3500,
     });
 
-    const textBlock = response.content.find((b) => b.type === "text");
-    if (!textBlock || textBlock.type !== "text") {
-      throw new Error("No text response from Claude");
+    if (!result.data) {
+      throw new Error("Failed to generate structured onboarding plan");
     }
 
-    const jsonMatch = textBlock.text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      throw new Error("No JSON found in response");
-    }
-
-    const parsed = OnboardingIntelligenceSchema.parse(JSON.parse(jsonMatch[0]));
-    const tokensUsed = (response.usage?.input_tokens || 0) + (response.usage?.output_tokens || 0);
-
-    const shouldEscalate = parsed.confidenceScore < 0.6;
+    const shouldEscalate = result.data.confidenceScore < 0.6;
 
     return {
       success: true,
-      data: parsed,
-      confidenceScore: parsed.confidenceScore,
+      data: result.data,
+      confidenceScore: result.data.confidenceScore,
       shouldEscalate,
       escalationReason: shouldEscalate
-        ? `Low confidence score (${parsed.confidenceScore}): Insufficient information to create optimal onboarding plan`
+        ? `Low confidence score (${result.data.confidenceScore}): Insufficient information to create optimal onboarding plan`
         : undefined,
-      tokensUsed,
+      tokensUsed: result.tokensUsed,
     };
   }
 }

@@ -27,21 +27,22 @@ export class RepurposeAgent extends BaseAgent {
 
   async execute(input: RepurposeInput): Promise<AgentResult<z.infer<typeof RepurposeOutputSchema>>> {
     const orgContext: OrgContext = input as unknown as OrgContext;
-    const systemPrompt = await this.buildCachedPrompt(orgContext);
+    const cachedBlocks = await this.buildCachedPrompt(orgContext);
+    const systemPrompt = cachedBlocks.map(b => b.text).join("\n\n");
     const userPrompt = buildRepurposePrompt(input);
 
-    const { text, tokensUsed } = await this.callClaude({
+    const result = await this.callLLM<z.infer<typeof RepurposeOutputSchema>>({
       system: systemPrompt,
       userMessage: userPrompt,
       maxTokens: 4000,
+      schema: RepurposeOutputSchema,
     });
 
-    if (!text) {
-      throw new Error("No text response from Claude");
+    if (!result.data) {
+      throw new Error("No structured data returned from LLM");
     }
 
-    const parsed = this.parseJsonResponse(text);
-    const validated = RepurposeOutputSchema.parse(parsed);
+    const validated = result.data;
 
     // Calculate overall confidence as average of output confidences
     const avgConfidence = validated.outputs.length > 0
@@ -58,7 +59,7 @@ export class RepurposeAgent extends BaseAgent {
       escalationReason: shouldEscalate
         ? `Low confidence (${avgConfidence.toFixed(2)}) or no outputs generated`
         : undefined,
-      tokensUsed,
+      tokensUsed: result.tokensUsed,
     };
   }
 

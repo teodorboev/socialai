@@ -5,7 +5,7 @@ import { SocialSeoSchema, SocialSeoInputSchema, type SocialSeoInput, type Social
 
 export class SocialSEOAgent extends BaseAgent {
   constructor() {
-    super("SOCIAL_SEO", "claude-sonnet-4-20250514");
+    super("SOCIAL_SEO");
   }
 
   async execute(input: SocialSeoInput): Promise<AgentResult<SocialSeo>> {
@@ -45,43 +45,29 @@ SOCIAL SEARCH FACTORS:
 Respond with a JSON object matching this schema:
 ${JSON.stringify(SocialSeoSchema.shape, null, 2)}`;
 
-    const response = await this.client.messages.create({
-      model: this.model,
-      max_tokens: 3000,
+    const result = await this.callLLM<SocialSeo>({
       system: systemPrompt,
-      messages: [
-        {
-          role: "user",
-          content: `Perform SEO analysis for ${parsedInput.brandName} in the ${parsedInput.industry} industry.`,
-        },
-      ],
+      userMessage: `Perform SEO analysis for ${parsedInput.brandName} in the ${parsedInput.industry} industry.`,
+      schema: SocialSeoSchema,
+      maxTokens: 3000,
     });
 
-    const textBlock = response.content.find((b) => b.type === "text");
-    if (!textBlock || textBlock.type !== "text") {
-      throw new Error("No text response from Claude");
+    if (!result.data) {
+      throw new Error("Failed to generate structured SEO analysis");
     }
-
-    const jsonMatch = textBlock.text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      throw new Error("No JSON found in response");
-    }
-
-    const parsed = SocialSeoSchema.parse(JSON.parse(jsonMatch[0]));
-    const tokensUsed = (response.usage?.input_tokens || 0) + (response.usage?.output_tokens || 0);
 
     // Escalate if SEO score is very low
-    const shouldEscalate = parsed.overallSeoScore < 0.3 || parsed.confidenceScore < 0.5;
+    const shouldEscalate = result.data.overallSeoScore < 0.3 || result.data.confidenceScore < 0.5;
 
     return {
       success: true,
-      data: parsed,
-      confidenceScore: parsed.confidenceScore,
+      data: result.data,
+      confidenceScore: result.data.confidenceScore,
       shouldEscalate,
       escalationReason: shouldEscalate
-        ? `Low SEO score (${parsed.overallSeoScore}) or insufficient data for analysis`
+        ? `Low SEO score (${result.data.overallSeoScore}) or insufficient data for analysis`
         : undefined,
-      tokensUsed,
+      tokensUsed: result.tokensUsed,
     };
   }
 }

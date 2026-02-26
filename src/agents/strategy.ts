@@ -94,36 +94,28 @@ export class StrategyAgent extends BaseAgent {
       clientGoals,
     };
 
-    const systemPrompt = await this.buildCachedPrompt(orgContext);
+    const cachedBlocks = await this.buildCachedPrompt(orgContext);
+    const systemPrompt = cachedBlocks.map(b => b.text).join("\n\n");
 
-    const { text, tokensUsed } = await this.callClaude({
+    const result = await this.callLLM<StrategyPlan>({
       system: systemPrompt,
       userMessage: `Create the monthly content strategy for ${brandConfig.brandName}.`,
+      schema: StrategyPlanSchema,
       maxTokens: 6000,
     });
 
-    if (!text) {
-      throw new Error("No text response from Claude");
-    }
-
-    // Parse the JSON response
-    let parsed: StrategyPlan;
-    try {
-      const jsonMatch = text.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) {
-        throw new Error("No JSON found in response");
-      }
-      parsed = StrategyPlanSchema.parse(JSON.parse(jsonMatch[0]));
-    } catch (parseError) {
-      console.error("Failed to parse strategy plan:", parseError, text);
+    if (!result.data) {
+      console.error("Failed to parse strategy plan");
       return {
         success: false,
         confidenceScore: 0,
         shouldEscalate: true,
         escalationReason: "Failed to parse AI response",
-        tokensUsed,
+        tokensUsed: result.tokensUsed,
       };
     }
+
+    const parsed = result.data;
 
     return {
       success: true,
@@ -131,7 +123,7 @@ export class StrategyAgent extends BaseAgent {
       confidenceScore: parsed.confidenceScore,
       shouldEscalate: parsed.confidenceScore < 0.7,
       escalationReason: parsed.confidenceScore < 0.7 ? `Low confidence (${parsed.confidenceScore}): ${parsed.reasoning}` : undefined,
-      tokensUsed,
+      tokensUsed: result.tokensUsed,
     };
   }
 }

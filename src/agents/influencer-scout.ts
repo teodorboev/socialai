@@ -72,18 +72,18 @@ Evaluate each candidate and respond with JSON:
 
 CRITICAL: Always recommend human review before any outreach.`;
 
-    const { text, tokensUsed } = await this.callClaude({
+    const result = await this.callLLM<z.infer<typeof InfluencerReportSchema>>({
       system: systemPrompt,
       userMessage: userPrompt,
       maxTokens: 4000,
+      schema: InfluencerReportSchema,
     });
 
-    if (!text) {
-      throw new Error("No text response from Claude");
+    if (!result.data) {
+      throw new Error("No structured data returned from LLM");
     }
 
-    const parsed = this.parseJsonResponse(text);
-    const validated = InfluencerReportSchema.parse(parsed);
+    const validated = result.data;
 
     // Always escalate - human must approve influencer outreach
     const qualifiedCount = validated.candidates.filter((c) => c.scores.overallFit >= 0.6 && c.scores.authenticityScore >= 0.5).length;
@@ -94,15 +94,7 @@ CRITICAL: Always recommend human review before any outreach.`;
       confidenceScore: validated.confidenceScore,
       shouldEscalate: true, // Always escalate - human decision required
       escalationReason: `Found ${qualifiedCount} qualified candidates - human review required before outreach`,
-      tokensUsed,
+      tokensUsed: result.tokensUsed,
     };
-  }
-
-  private parseJsonResponse(text: string): unknown {
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      throw new Error("No JSON found in Claude response");
-    }
-    return JSON.parse(jsonMatch[0]);
   }
 }

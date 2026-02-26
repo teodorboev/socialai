@@ -192,7 +192,7 @@ export async function complete(request: SmartRouterRequest): Promise<SmartRouter
       modelDisplayName: resolvedModel.model.displayName,
       inputTokens: response.usage.inputTokens,
       outputTokens: response.usage.outputTokens,
-      cachedTokens: response.usage.cachedTokens,
+      cachedTokens: response.usage.cachedTokens ?? 0,
       totalTokens: response.usage.inputTokens + response.usage.outputTokens,
       inputCost: cost.inputCost,
       outputCost: cost.outputCost,
@@ -212,7 +212,7 @@ export async function complete(request: SmartRouterRequest): Promise<SmartRouter
       usage: {
         inputTokens: response.usage.inputTokens,
         outputTokens: response.usage.outputTokens,
-        cachedTokens: response.usage.cachedTokens,
+      cachedTokens: response.usage.cachedTokens ?? 0,
         totalTokens: response.usage.inputTokens + response.usage.outputTokens,
       },
       cost,

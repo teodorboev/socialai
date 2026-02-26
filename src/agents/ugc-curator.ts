@@ -10,7 +10,7 @@ import {
 
 export class UGCuratorAgent extends BaseAgent {
   constructor() {
-    super("UGC_CURATOR", "claude-sonnet-4-20250514");
+    super("UGC_CURATOR");
   }
 
   async execute(input: UGCuratorInput): Promise<AgentResult<UGCurator>> {
@@ -54,42 +54,28 @@ INSTRUCTIONS:
 Respond with a JSON object matching this schema:
 ${JSON.stringify(UGCuratorSchema.shape, null, 2)}`;
 
-    const response = await this.client.messages.create({
-      model: this.model,
-      max_tokens: 3500,
+    const result = await this.callLLM<UGCurator>({
       system: systemPrompt,
-      messages: [
-        {
-          role: "user",
-          content: `Review ${parsedInput.ugcSubmissions.length} UGC submissions for ${parsedInput.brandGuidelines.brandName} and organize them into campaigns.`,
-        },
-      ],
+      userMessage: `Review ${parsedInput.ugcSubmissions.length} UGC submissions for ${parsedInput.brandGuidelines.brandName} and organize them into campaigns.`,
+      schema: UGCuratorSchema,
+      maxTokens: 3500,
     });
 
-    const textBlock = response.content.find((b) => b.type === "text");
-    if (!textBlock || textBlock.type !== "text") {
-      throw new Error("No text response from Claude");
+    if (!result.data) {
+      throw new Error("Failed to generate structured UGC curation results");
     }
 
-    const jsonMatch = textBlock.text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      throw new Error("No JSON found in response");
-    }
-
-    const parsed = UGCuratorSchema.parse(JSON.parse(jsonMatch[0]));
-    const tokensUsed = (response.usage?.input_tokens || 0) + (response.usage?.output_tokens || 0);
-
-    const shouldEscalate = parsed.confidenceScore < 0.6;
+    const shouldEscalate = result.data.confidenceScore < 0.6;
 
     return {
       success: true,
-      data: parsed,
-      confidenceScore: parsed.confidenceScore,
+      data: result.data,
+      confidenceScore: result.data.confidenceScore,
       shouldEscalate,
       escalationReason: shouldEscalate
-        ? `Low confidence score (${parsed.confidenceScore}): Unable to confidently assess UGC against brand guidelines`
+        ? `Low confidence score (${result.data.confidenceScore}): Unable to confidently assess UGC against brand guidelines`
         : undefined,
-      tokensUsed,
+      tokensUsed: result.tokensUsed,
     };
   }
 }

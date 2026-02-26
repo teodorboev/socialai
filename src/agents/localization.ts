@@ -75,18 +75,18 @@ Respond with JSON:
   "overallConfidenceScore": 0.0-1.0
 }`;
 
-    const { text, tokensUsed } = await this.callClaude({
+    const result = await this.callLLM<z.infer<typeof LocalizationOutputSchema>>({
       system: systemPrompt,
       userMessage: userPrompt,
       maxTokens: 4000,
+      schema: LocalizationOutputSchema,
     });
 
-    if (!text) {
-      throw new Error("No text response from Claude");
+    if (!result.data) {
+      throw new Error("No structured data returned from LLM");
     }
 
-    const parsed = this.parseJsonResponse(text);
-    const validated = LocalizationOutputSchema.parse(parsed);
+    const validated = result.data;
 
     const avgConfidence = validated.localizations.length > 0
       ? validated.localizations.reduce((sum, l) => sum + l.confidenceScore, 0) / validated.localizations.length
@@ -102,15 +102,7 @@ Respond with JSON:
       escalationReason: shouldEscalate
         ? `Low confidence (${avgConfidence.toFixed(2)}) or skip recommendations: ${validated.localizations.filter((l) => l.skipRecommendation).map((l) => l.targetLocale).join(", ")}`
         : undefined,
-      tokensUsed,
+      tokensUsed: result.tokensUsed,
     };
-  }
-
-  private parseJsonResponse(text: string): unknown {
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      throw new Error("No JSON found in Claude response");
-    }
-    return JSON.parse(jsonMatch[0]);
   }
 }

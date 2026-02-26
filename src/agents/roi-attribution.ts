@@ -5,7 +5,7 @@ import { RoiAttributionSchema, RoiAttributionInputSchema, type RoiAttributionInp
 
 export class RoiAttributionAgent extends BaseAgent {
   constructor() {
-    super("ROI_ATTRIBUTION", "claude-sonnet-4-20250514");
+    super("ROI_ATTRIBUTION");
   }
 
   async execute(input: RoiAttributionInput): Promise<AgentResult<RoiAttribution>> {
@@ -39,43 +39,29 @@ IMPORTANT:
 Respond with a JSON object matching this schema:
 ${JSON.stringify(RoiAttributionSchema.shape, null, 2)}`;
 
-    const response = await this.client.messages.create({
-      model: this.model,
-      max_tokens: 3000,
+    const result = await this.callLLM<RoiAttribution>({
       system: systemPrompt,
-      messages: [
-        {
-          role: "user",
-          content: `Analyze the ROI attribution for ${parsedInput.organizationId} for the period ${parsedInput.period.start} to ${parsedInput.period.end}. Provide detailed attribution analysis.`,
-        },
-      ],
+      userMessage: `Analyze the ROI attribution for ${parsedInput.organizationId} for the period ${parsedInput.period.start} to ${parsedInput.period.end}. Provide detailed attribution analysis.`,
+      schema: RoiAttributionSchema,
+      maxTokens: 3000,
     });
 
-    const textBlock = response.content.find((b) => b.type === "text");
-    if (!textBlock || textBlock.type !== "text") {
-      throw new Error("No text response from Claude");
+    if (!result.data) {
+      throw new Error("Failed to generate structured ROI attribution analysis");
     }
-
-    const jsonMatch = textBlock.text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      throw new Error("No JSON found in response");
-    }
-
-    const parsed = RoiAttributionSchema.parse(JSON.parse(jsonMatch[0]));
-    const tokensUsed = (response.usage?.input_tokens || 0) + (response.usage?.output_tokens || 0);
 
     // Determine if we should escalate based on confidence
-    const shouldEscalate = parsed.confidenceScore < 0.6;
+    const shouldEscalate = result.data.confidenceScore < 0.6;
 
     return {
       success: true,
-      data: parsed,
-      confidenceScore: parsed.confidenceScore,
+      data: result.data,
+      confidenceScore: result.data.confidenceScore,
       shouldEscalate,
       escalationReason: shouldEscalate
-        ? `Low confidence score (${parsed.confidenceScore}): Data quality may be insufficient for accurate attribution`
+        ? `Low confidence score (${result.data.confidenceScore}): Data quality may be insufficient for accurate attribution`
         : undefined,
-      tokensUsed,
+      tokensUsed: result.tokensUsed,
     };
   }
 }
