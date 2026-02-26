@@ -11,11 +11,22 @@ import {
   LayoutDashboard,
   Settings as SettingsIcon,
   AlertTriangle,
+  CreditCard,
+  Users,
+  DollarSign,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navigation = [
   { name: "Overview", href: "/admin", icon: LayoutDashboard },
+];
+
+const billingNav = [
+  { name: "Plans", href: "/admin/billing/plans", icon: CreditCard },
+  { name: "Clients", href: "/admin/billing/clients", icon: Users },
+];
+
+const systemNav = [
   { name: "Platforms", href: "/admin/platforms", icon: Server },
   { name: "Prompts", href: "/admin/prompts", icon: FileText },
   { name: "Feature Flags", href: "/admin/flags", icon: Flag },
@@ -42,6 +53,58 @@ export default function AdminLayout({
         <div className="flex flex-1 flex-col overflow-y-auto bg-white border-r">
           <nav className="flex flex-1 flex-col gap-1 p-4">
             {navigation.map((item) => {
+              const isActive = pathname === item.href || 
+                (item.href !== "/admin" && pathname.startsWith(item.href));
+              return (
+                <Link
+                  key={item.name}
+                  href={item.href}
+                  className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                    isActive
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                  )}
+                >
+                  <item.icon className="h-5 w-5" />
+                  {item.name}
+                </Link>
+              );
+            })}
+
+            {/* Billing Section */}
+            <div className="pt-4 pb-2">
+              <div className="px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                Billing
+              </div>
+            </div>
+            {billingNav.map((item) => {
+              const isActive = pathname === item.href || 
+                (item.href !== "/admin" && pathname.startsWith(item.href));
+              return (
+                <Link
+                  key={item.name}
+                  href={item.href}
+                  className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                    isActive
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                  )}
+                >
+                  <item.icon className="h-5 w-5" />
+                  {item.name}
+                </Link>
+              );
+            })}
+
+            {/* System Section */}
+            <div className="pt-4 pb-2">
+              <div className="px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                System
+              </div>
+            </div>
+            {systemNav.map((item) => {
               const isActive = pathname === item.href || 
                 (item.href !== "/admin" && pathname.startsWith(item.href));
               return (
