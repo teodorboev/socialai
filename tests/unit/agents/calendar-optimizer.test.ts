@@ -18,16 +18,70 @@ vi.mock("@/lib/prisma", () => ({
   },
 }));
 
+vi.mock("@/lib/supabase/admin", () => ({
+  supabaseAdmin: {
+    from: vi.fn().mockReturnValue({
+      select: vi.fn().mockReturnValue({
+        eq: vi.fn().mockReturnValue({
+          single: vi.fn().mockResolvedValue({ data: null, error: null }),
+        }),
+      }),
+    }),
+  },
+}));
+
 vi.mock("@/lib/router", () => ({
   smartRouter: {
     complete: vi.fn().mockResolvedValue({
       content: JSON.stringify({
         optimizedSchedule: [
-          { dayOfWeek: "Monday", time: "10:00", platform: "INSTAGRAM", contentType: "POST" },
-          { dayOfWeek: "Wednesday", time: "14:00", platform: "TIKTOK", contentType: "REEL" },
-          { dayOfWeek: "Friday", time: "12:00", platform: "LINKEDIN", contentType: "ARTICLE" },
+          { 
+            platform: "INSTAGRAM", 
+            dayOfWeek: 1, 
+            timeUtc: "10:00", 
+            timeLocal: "05:00",
+            contentTypes: ["POST", "CAROUSEL"], 
+            frequency: { postsPerWeek: 5, storiesPerWeek: 3, reelsPerWeek: 2 },
+            rationale: "Best engagement on Monday mornings",
+            confidence: 0.85
+          },
+          { 
+            platform: "TIKTOK", 
+            dayOfWeek: 3, 
+            timeUtc: "14:00", 
+            timeLocal: "09:00",
+            contentTypes: ["VIDEO"], 
+            frequency: { postsPerWeek: 3 },
+            rationale: "Peak audience activity mid-week",
+            confidence: 0.78
+          },
+          { 
+            platform: "LINKEDIN", 
+            dayOfWeek: 5, 
+            timeUtc: "12:00", 
+            timeLocal: "07:00",
+            contentTypes: ["ARTICLE"], 
+            frequency: { postsPerWeek: 2 },
+            rationale: "Professional audience active on Fridays",
+            confidence: 0.82
+          },
         ],
-        rationale: "Balanced mix with optimal engagement times",
+        rationale: {
+          summary: "Balanced mix with optimal engagement times",
+          dataPoints: [
+            { metric: "Engagement Rate", insight: "Higher on weekdays", impact: "Positive" }
+          ],
+          changes: [
+            { what: "Posting frequency", from: "3/week", to: "5/week", reason: "More opportunities" }
+          ]
+        },
+        expectedImprovement: {
+          overall: { engagementIncrease: 15, reachIncrease: 20, followerGrowth: 10 },
+          byPlatform: [{ platform: "INSTAGRAM", engagementIncrease: 18, bestTime: "10:00" }],
+          timeline: "2-4 weeks"
+        },
+        conflictsResolved: [],
+        confidenceScore: 0.82,
       }),
       usage: { inputTokens: 1500, outputTokens: 800, cachedTokens: 0, totalTokens: 2300 },
       cost: { inputCost: 0.0045, outputCost: 0.012, cacheSavings: 0, totalCost: 0.0165 },
@@ -38,6 +92,58 @@ vi.mock("@/lib/router", () => ({
       fallbacksAttempted: 0,
     }),
   },
+}));
+
+// Mock the prompt loader to avoid needing other dependencies
+vi.mock("@/lib/ai/prompts/loader", () => ({
+  loadPrompt: vi.fn().mockRejectedValue(new Error("Prompt not found")),
+}));
+
+// Mock memory modules to avoid OpenAI credential issues
+vi.mock("@/lib/memory/embeddings", () => ({
+  createEmbedding: vi.fn().mockResolvedValue(new Array(1536).fill(0).map(() => Math.random())),
+  generateEmbedding: vi.fn().mockResolvedValue(new Array(1536).fill(0).map(() => Math.random())),
+  generateEmbeddings: vi.fn().mockResolvedValue([
+    new Array(1536).fill(0).map(() => Math.random()),
+  ]),
+  getEmbeddingConfig: vi.fn().mockReturnValue({ provider: "openai", model: "text-embedding-3-small" }),
+  estimateTokens: vi.fn().mockReturnValue(100),
+  truncateToTokens: vi.fn().mockImplementation((text: string) => text),
+}));
+
+vi.mock("@/lib/memory/store", () => ({
+  MemoryStore: vi.fn().mockImplementation(() => ({
+    add: vi.fn().mockResolvedValue(undefined),
+    search: vi.fn().mockResolvedValue([]),
+  })),
+  storeMemory: vi.fn().mockResolvedValue(undefined),
+  storeMemories: vi.fn().mockResolvedValue(undefined),
+  DEFAULT_IMPORTANCE: {},
+  EXPIRATION_DAYS: {},
+}));
+
+vi.mock("@/lib/memory/recall", () => ({
+  recallMemories: vi.fn().mockResolvedValue([]),
+  recall: vi.fn().mockResolvedValue([]),
+}));
+
+vi.mock("@/lib/memory/recent", () => ({
+  getRecentMemories: vi.fn().mockResolvedValue([]),
+  getRecentByTypes: vi.fn().mockResolvedValue([]),
+  recent: vi.fn().mockResolvedValue([]),
+  recentByTypes: vi.fn().mockResolvedValue([]),
+}));
+
+vi.mock("@/lib/memory", () => ({
+  memory: {
+    store: vi.fn().mockResolvedValue(undefined),
+    storeMany: vi.fn().mockResolvedValue(undefined),
+    recall: vi.fn().mockResolvedValue([]),
+    recent: vi.fn().mockResolvedValue([]),
+    recentByTypes: vi.fn().mockResolvedValue([]),
+  },
+  MAX_MEMORY_CONTEXT_TOKENS: 2000,
+  formatMemoriesForPrompt: vi.fn().mockReturnValue(""),
 }));
 
 describe("CalendarOptimizerAgent - Initialization", () => {
@@ -76,9 +182,20 @@ describe("CalendarOptimizerAgent - Schedule Optimization", () => {
         overallMetrics: { avgEngagementRate: 0.05, totalPosts: 50 },
       },
       audienceData: {
-        peakHours: [9, 12, 15, 18, 20],
-        peakDays: [1, 2, 3, 4, 5],
         timezone: "America/New_York",
+        activeHours: [
+          { dayOfWeek: 1, hourStart: 9, hourEnd: 12, activity: "HIGH" as const },
+          { dayOfWeek: 1, hourStart: 12, hourEnd: 15, activity: "MEDIUM" as const },
+          { dayOfWeek: 1, hourStart: 15, hourEnd: 18, activity: "HIGH" as const },
+          { dayOfWeek: 1, hourStart: 18, hourEnd: 20, activity: "HIGH" as const },
+          { dayOfWeek: 2, hourStart: 9, hourEnd: 12, activity: "HIGH" as const },
+          { dayOfWeek: 2, hourStart: 12, hourEnd: 15, activity: "MEDIUM" as const },
+          { dayOfWeek: 3, hourStart: 9, hourEnd: 12, activity: "HIGH" as const },
+          { dayOfWeek: 3, hourStart: 15, hourEnd: 18, activity: "HIGH" as const },
+          { dayOfWeek: 4, hourStart: 9, hourEnd: 12, activity: "HIGH" as const },
+          { dayOfWeek: 4, hourStart: 12, hourEnd: 15, activity: "MEDIUM" as const },
+          { dayOfWeek: 5, hourStart: 9, hourEnd: 12, activity: "HIGH" as const },
+        ],
       },
     };
 
@@ -110,9 +227,14 @@ describe("CalendarOptimizerAgent - Schedule Optimization", () => {
         ],
       },
       audienceData: {
-        peakHours: [10, 14, 18],
-        peakDays: [2, 4, 6],
         timezone: "UTC",
+        activeHours: [
+          { dayOfWeek: 2, hourStart: 10, hourEnd: 14, activity: "HIGH" as const },
+          { dayOfWeek: 2, hourStart: 14, hourEnd: 18, activity: "MEDIUM" as const },
+          { dayOfWeek: 4, hourStart: 10, hourEnd: 14, activity: "HIGH" as const },
+          { dayOfWeek: 4, hourStart: 14, hourEnd: 18, activity: "MEDIUM" as const },
+          { dayOfWeek: 6, hourStart: 10, hourEnd: 14, activity: "HIGH" as const },
+        ],
       },
     };
 
@@ -141,9 +263,15 @@ describe("CalendarOptimizerAgent - Schedule Optimization", () => {
         ],
       },
       audienceData: {
-        peakHours: [8, 10, 12],
-        peakDays: [2, 3, 4],
         timezone: "America/Los_Angeles",
+        activeHours: [
+          { dayOfWeek: 2, hourStart: 8, hourEnd: 10, activity: "HIGH" as const },
+          { dayOfWeek: 2, hourStart: 10, hourEnd: 12, activity: "HIGH" as const },
+          { dayOfWeek: 3, hourStart: 8, hourEnd: 10, activity: "HIGH" as const },
+          { dayOfWeek: 3, hourStart: 10, hourEnd: 12, activity: "HIGH" as const },
+          { dayOfWeek: 4, hourStart: 8, hourEnd: 10, activity: "HIGH" as const },
+          { dayOfWeek: 4, hourStart: 10, hourEnd: 12, activity: "HIGH" as const },
+        ],
       },
     };
 

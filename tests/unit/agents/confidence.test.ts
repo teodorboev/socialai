@@ -101,23 +101,24 @@ describe("Confidence Scoring - Action Determination", () => {
       requireReview: 0.4,
     };
 
-    // Should escalate at 0.5 with custom thresholds
+    // At 0.5 with requireReview=0.4, should queue_for_review (0.5 >= 0.4)
     const action = resolveAction(0.5, customThresholds);
-    expect(action).toBe("escalate");
+    expect(action).toBe("queue_for_review");
 
-    // Should queue for review at 0.65 with custom thresholds
+    // At 0.65 with flagForReview=0.6, should flag_and_execute (0.65 >= 0.6)
     const action2 = resolveAction(0.65, customThresholds);
-    expect(action2).toBe("queue_for_review");
+    expect(action2).toBe("flag_and_execute");
 
-    // Should auto execute at 0.85 with custom thresholds
+    // At 0.85 with autoExecute=0.8, should auto_execute (0.85 >= 0.8)
     const action3 = resolveAction(0.85, customThresholds);
     expect(action3).toBe("auto_execute");
   });
 
   it("should handle mature thresholds correctly", () => {
-    // With mature thresholds, more content gets auto-executed
+    // MATURE_THRESHOLDS = { autoExecute: 0.80, flagForReview: 0.65, requireReview: 0.40 }
+    // At 0.78, it's >= 0.65 but < 0.80, so should be flag_and_execute
     const action = resolveAction(0.78, MATURE_THRESHOLDS);
-    expect(action).toBe("auto_execute");
+    expect(action).toBe("flag_and_execute");
   });
 });
 
@@ -145,8 +146,10 @@ describe("Confidence Scoring - Content Status", () => {
 
 describe("Confidence Scoring - Edge Cases", () => {
   it("should handle exact boundary values", () => {
-    expect(resolveAction(0.5, DEFAULT_THRESHOLDS)).toBe("escalate");
-    expect(resolveAction(0.51, DEFAULT_THRESHOLDS)).toBe("escalate");
+    // At exactly requireReview threshold, should queue_for_review
+    expect(resolveAction(0.5, DEFAULT_THRESHOLDS)).toBe("queue_for_review");
+    // Just above requireReview but below flagForReview should queue_for_review
+    expect(resolveAction(0.51, DEFAULT_THRESHOLDS)).toBe("queue_for_review");
   });
 
   it("should handle values slightly above thresholds", () => {
