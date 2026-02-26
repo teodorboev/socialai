@@ -160,7 +160,7 @@ export const contentFactory = {
         contentId: content.id,
         socialAccountId: overrides.socialAccountId || (await prisma.socialAccount.findFirst({ where: { organizationId } }))?.id,
         scheduledFor,
-        status: "pending",
+        status: "PENDING" as const,
       },
     });
 

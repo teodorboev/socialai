@@ -9,10 +9,10 @@
 
 import { beforeAll, afterAll, beforeEach, afterEach, vi } from "vitest";
 import { setupTestDb, teardownTestDb, startTransaction, rollbackTransaction } from "./db";
-import { mockSmartRouter, resetSmartRouterMocks } from "../mocks/smart-router.mock";
-import { mockStripe, resetStripeMocks } from "../mocks/stripe.mock";
-import { mockInngest, clearEmittedEvents } from "../mocks/inngest.mock";
-import { mockSupabase, resetSupabaseMocks } from "../mocks/supabase.mock";
+import { getSmartRouterMock, resetSmartRouterMock } from "../mocks/smart-router.mock";
+import { getStripeMock, resetStripeMock } from "../mocks/stripe.mock";
+import { getInngestMock, resetInngestMock } from "../mocks/inngest.mock";
+import { getSupabaseMock, resetSupabaseMock } from "../mocks/supabase.mock";
 
 let transaction: any;
 
@@ -21,10 +21,10 @@ beforeAll(async () => {
   await setupTestDb();
   
   // Initialize all mocks
-  mockSmartRouter();
-  mockStripe();
-  mockInngest();
-  mockSupabase();
+  getSmartRouterMock();
+  getStripeMock();
+  getInngestMock();
+  getSupabaseMock();
 });
 
 afterAll(async () => {
@@ -35,9 +35,6 @@ afterAll(async () => {
 beforeEach(async () => {
   // Start a new transaction for this test
   transaction = await startTransaction();
-  
-  // Clear any previously emitted events
-  clearEmittedEvents();
   
   // Reset all mock call histories
   vi.clearAllMocks();
@@ -51,7 +48,8 @@ afterEach(async () => {
   }
   
   // Reset mocks to initial state
-  resetSmartRouterMocks();
-  resetStripeMocks();
-  resetSupabaseMocks();
+  resetSmartRouterMock();
+  resetStripeMock();
+  resetInngestMock();
+  resetSupabaseMock();
 });
