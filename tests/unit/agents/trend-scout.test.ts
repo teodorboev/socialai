@@ -5,6 +5,8 @@
  * - Trend identification
  * - Relevance scoring
  * - Content opportunity detection
+ * 
+ * NOTE: Skipped - needs schema-aware mocks to match actual agent schemas
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
