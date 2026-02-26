@@ -106,7 +106,7 @@ export default function DashboardLayout({
         
         const isSA = !!superAdmin;
         setIsSuperAdmin(isSA);
-        sessionStorage.setItem("isSuperAdmin", String(isSA);
+        sessionStorage.setItem("isSuperAdmin", String(isSA));
 
         const { data: orgMember } = await supabase
           .from("org_members")
