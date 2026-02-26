@@ -189,9 +189,65 @@ Identify relevant trends for the brand.`,
   console.log("✓ Prompt templates seeded");
 
   // ============================================================
-  // FEATURE FLAGS
+  // FEATURE FLAGS - Agents
   // ============================================================
-  const featureFlags = [
+  const agentFeatureFlags = [
+    // Core agents (available to all plans)
+    { key: "agent_content_creator", name: "Content Creator", description: "AI-powered content generation", isEnabled: true, planMinimum: null as any, category: "core" },
+    { key: "agent_engagement", name: "Engagement Agent", description: "Auto-respond to comments and DMs", isEnabled: true, planMinimum: null as any, category: "core" },
+    { key: "agent_publisher", name: "Publisher", description: "Publish content to social platforms", isEnabled: true, planMinimum: null as any, category: "core" },
+    { key: "agent_analytics", name: "Analytics Agent", description: "Performance analytics and reporting", isEnabled: true, planMinimum: null as any, category: "core" },
+    { key: "agent_strategy", name: "Strategy Agent", description: "Content strategy and planning", isEnabled: true, planMinimum: null as any, category: "core" },
+    { key: "agent_trend_scout", name: "Trend Scout", description: "Detect trending topics", isEnabled: false, planMinimum: "PRO" as any, category: "intelligence" },
+    { key: "agent_compliance", name: "Compliance Agent", description: "Content safety and compliance", isEnabled: true, planMinimum: null as any, category: "core" },
+    { key: "agent_content_replenishment", name: "Content Replenishment", description: "Monitor content pipeline", isEnabled: true, planMinimum: null as any, category: "core" },
+    { key: "agent_calendar_optimizer", name: "Calendar Optimizer", description: "Optimize posting schedule", isEnabled: true, planMinimum: null as any, category: "core" },
+    { key: "agent_hashtag_optimizer", name: "Hashtag Optimizer", description: "Optimize hashtag strategy", isEnabled: true, planMinimum: null as any, category: "core" },
+    
+    // Intelligence agents (Growth+)
+    { key: "agent_competitor_intelligence", name: "Competitor Intelligence", description: "Monitor competitors", isEnabled: false, planMinimum: "GROWTH" as any, category: "intelligence" },
+    { key: "agent_social_listening", name: "Social Listening", description: "Monitor brand mentions", isEnabled: false, planMinimum: "PRO" as any, category: "intelligence" },
+    { key: "agent_audience_intelligence", name: "Audience Intelligence", description: "Audience insights", isEnabled: false, planMinimum: "GROWTH" as any, category: "intelligence" },
+    { key: "agent_influencer_scout", name: "Influencer Scout", description: "Find influencers", isEnabled: false, planMinimum: "PRO" as any, category: "intelligence" },
+    { key: "agent_social_seo", name: "Social SEO", description: "Social search optimization", isEnabled: false, planMinimum: "GROWTH" as any, category: "intelligence" },
+    { key: "agent_caption_rewriter", name: "Caption Rewriter", description: "Rewrite underperforming content", isEnabled: false, planMinimum: "GROWTH" as any, category: "intelligence" },
+    { key: "agent_brand_voice_guardian", name: "Brand Voice Guardian", description: "Maintain brand consistency", isEnabled: false, planMinimum: "GROWTH" as any, category: "intelligence" },
+    { key: "agent_reporting_narrator", name: "Reporting Narrator", description: "AI-powered reports", isEnabled: false, planMinimum: "GROWTH" as any, category: "intelligence" },
+    
+    // Premium agents (Pro+)
+    { key: "agent_creative_director", name: "Creative Director", description: "Generate visual content", isEnabled: false, planMinimum: "PRO" as any, category: "premium" },
+    { key: "agent_predictive_content", name: "Predictive Content", description: "Predict content performance", isEnabled: false, planMinimum: "PRO" as any, category: "premium" },
+    { key: "agent_roi_attribution", name: "ROI Attribution", description: "Track revenue attribution", isEnabled: false, planMinimum: "PRO" as any, category: "premium" },
+    { key: "agent_cross_channel_attribution", name: "Cross-Channel Attribution", description: "Multi-touch attribution", isEnabled: false, planMinimum: "PRO" as any, category: "premium" },
+    { key: "agent_ad_copy", name: "Ad Copy", description: "Generate paid ad copy", isEnabled: false, planMinimum: "PRO" as any, category: "premium" },
+    { key: "agent_sentiment_intelligence", name: "Sentiment Intelligence", description: "Deep sentiment analysis", isEnabled: false, planMinimum: "PRO" as any, category: "premium" },
+    { key: "agent_competitive_ad_intelligence", name: "Competitive Ad Intelligence", description: "Monitor competitor ads", isEnabled: false, planMinimum: "PRO" as any, category: "premium" },
+    { key: "agent_pricing_intelligence", name: "Pricing Intelligence", description: "Competitive pricing analysis", isEnabled: false, planMinimum: "PRO" as any, category: "premium" },
+    { key: "agent_community_builder", name: "Community Builder", description: "Build brand community", isEnabled: false, planMinimum: "PRO" as any, category: "premium" },
+    { key: "agent_media_pitch", name: "Media Pitch", description: "PR and media outreach", isEnabled: false, planMinimum: "PRO" as any, category: "premium" },
+    { key: "agent_ugc_curator", name: "UGC Curator", description: "User-generated content", isEnabled: false, planMinimum: "PRO" as any, category: "premium" },
+    { key: "agent_review_response", name: "Review Response", description: "Respond to reviews", isEnabled: false, planMinimum: "PRO" as any, category: "premium" },
+    { key: "agent_repurpose", name: "Repurpose", description: "Repurpose content across platforms", isEnabled: false, planMinimum: "PRO" as any, category: "premium" },
+    { key: "agent_localization", name: "Localization", description: "Multi-language content", isEnabled: false, planMinimum: "PRO" as any, category: "premium" },
+    { key: "agent_churn_prediction", name: "Churn Prediction", description: "Predict client churn", isEnabled: false, planMinimum: "PRO" as any, category: "premium" },
+    { key: "agent_onboarding_intelligence", name: "Onboarding Intelligence", description: "Client onboarding", isEnabled: false, planMinimum: "PRO" as any, category: "premium" },
+    { key: "agent_ab_testing", name: "A/B Testing", description: "Content A/B testing", isEnabled: false, planMinimum: "GROWTH" as any, category: "intelligence" },
+  ];
+
+  for (const flag of agentFeatureFlags) {
+    const { category, ...flagData } = flag;
+    await prisma.featureFlag.upsert({
+      where: { key: flag.key },
+      update: flagData,
+      create: flagData,
+    });
+  }
+  console.log("✓ Agent feature flags seeded (" + agentFeatureFlags.length + " agents)");
+
+  // ============================================================
+  // FEATURE FLAGS - System Features (non-agents)
+  // ============================================================
+  const systemFeatureFlags = [
     {
       key: "auto_engagement",
       name: "Auto Engagement",
@@ -264,14 +320,14 @@ Identify relevant trends for the brand.`,
     },
   ];
 
-  for (const flag of featureFlags) {
+  for (const flag of systemFeatureFlags) {
     await prisma.featureFlag.upsert({
       where: { key: flag.key },
       update: flag,
       create: flag,
     });
   }
-  console.log("✓ Feature flags seeded");
+  console.log("✓ System feature flags seeded");
 
   // ============================================================
   // SAFETY CONFIGS
@@ -487,12 +543,33 @@ Identify relevant trends for the brand.`,
   // ============================================================
   // BILLING PLANS
   // ============================================================
+  // Default agents by tier (used to populate plans)
+  // ============================================================
+  const DEFAULT_CORE_AGENTS = [
+    "CONTENT_CREATOR", "ENGAGEMENT", "PUBLISHER", "ANALYTICS", "STRATEGY",
+    "TREND_SCOUT", "COMPLIANCE", "CONTENT_REPLENISHMENT", "CALENDAR_OPTIMIZER", "HASHTAG_OPTIMIZER"
+  ];
+  const DEFAULT_INTELLIGENCE_AGENTS = [
+    ...DEFAULT_CORE_AGENTS,
+    "COMPETITOR_INTELLIGENCE", "SOCIAL_LISTENING", "AUDIENCE_INTELLIGENCE", "INFLUENCER_SCOUT",
+    "SOCIAL_SEO", "CAPTION_REWRITER", "BRAND_VOICE_GUARDIAN", "REPORTING_NARRATOR", "AB_TESTING"
+  ];
+  const DEFAULT_FULL_AGENTS = [
+    ...DEFAULT_INTELLIGENCE_AGENTS,
+    "CREATIVE_DIRECTOR", "PREDICTIVE_CONTENT", "ROI_ATTRIBUTION", "CROSS_CHANNEL_ATTRIBUTION",
+    "AD_COPY", "SENTIMENT_INTELLIGENCE", "COMPETITIVE_AD_INTELLIGENCE", "PRICING_INTELLIGENCE",
+    "COMMUNITY_BUILDER", "MEDIA_PITCH", "UGC_CURATOR", "REVIEW_RESPONSE", "REPURPOSE",
+    "LOCALIZATION", "CHURN_PREDICTION", "ONBOARDING_INTELLIGENCE"
+  ];
+
+  // ============================================================
   const billingPlans = [
     {
       name: "Starter",
       slug: "starter",
       description: "Perfect for small businesses getting started with AI social media",
       agentTier: "core",
+      enabledAgents: DEFAULT_CORE_AGENTS,
       trialDays: 14,
       maxPlatforms: 2,
       maxPostsPerMonth: 40,
@@ -513,6 +590,7 @@ Identify relevant trends for the brand.`,
       slug: "growth",
       description: "For growing businesses that need more platforms and advanced AI",
       agentTier: "intelligence",
+      enabledAgents: DEFAULT_INTELLIGENCE_AGENTS,
       trialDays: 14,
       maxPlatforms: 4,
       maxPostsPerMonth: 80,
@@ -533,6 +611,7 @@ Identify relevant trends for the brand.`,
       slug: "pro",
       description: "For agencies and businesses that need full AI capabilities",
       agentTier: "full",
+      enabledAgents: DEFAULT_FULL_AGENTS,
       trialDays: 14,
       maxPlatforms: -1, // unlimited
       maxPostsPerMonth: -1, // unlimited
