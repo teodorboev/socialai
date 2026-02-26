@@ -13,7 +13,8 @@ import {
   AlertTriangle,
   CreditCard,
   Users,
-  DollarSign,
+  Receipt,
+  BarChart3,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -24,6 +25,8 @@ const navigation = [
 const billingNav = [
   { name: "Plans", href: "/admin/billing/plans", icon: CreditCard },
   { name: "Clients", href: "/admin/billing/clients", icon: Users },
+  { name: "Events", href: "/admin/billing/events", icon: Receipt },
+  { name: "Usage", href: "/admin/billing/usage", icon: BarChart3 },
 ];
 
 const systemNav = [
