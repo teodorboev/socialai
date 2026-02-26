@@ -20,6 +20,10 @@ export class CompetitorIntelligenceAgent extends BaseAgent {
       maxTokens: 4000,
     });
 
+    if (!text) {
+      throw new Error("No text response from Claude");
+    }
+
     // Parse and validate the response
     const parsed = this.parseJsonResponse(text);
     const validated = CompetitorReportSchema.parse(parsed);

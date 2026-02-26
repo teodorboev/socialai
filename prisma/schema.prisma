@@ -40,6 +40,7 @@ model Organization {
   listeningKeywords  ListeningKeyword[]
   listeningMentions  ListeningMention[]
   competitors        Competitor[]
+  engagementTemplates EngagementTemplate[]
   influencerCandidates InfluencerCandidate[]
   audienceProfiles   AudienceProfile[]
   
@@ -1783,11 +1784,22 @@ model AgentCostEvent {
   outputTokens    Int      @default(0) @map("output_tokens")
   totalTokens     Int      @default(0) @map("total_tokens")
 
+  // Cache tokens (from prompt caching)
+  cacheReadTokens  Int      @default(0) @map("cache_read_tokens")
+  cacheWriteTokens Int      @default(0) @map("cache_write_tokens")
+
   // Actual cost from provider (in cents)
   costCents       Float    @default(0) @map("cost_cents")
 
   // Model used
   model           String?
+
+  // Platform (for engagement agent)
+  platform        String?
+
+  // Cache layer tracking
+  cacheLayer      String?   @map("cache_layer") // "engagement_dedup" | "prompt_cache" | "template_short_circuit"
+  cacheHit        Boolean   @default(false) @map("cache_hit")
 
   // Context
   contentId       String?  @map("content_id") @db.Uuid
@@ -1799,5 +1811,28 @@ model AgentCostEvent {
 
   @@index([organizationId, period])
   @@index([organizationId, agentName, period])
+  @@index([agentName, cacheHit])
   @@index([createdAt])
+}
+
+// ============================================================
+// ENGAGEMENT TEMPLATES (Layer 3: Template Short-Circuit)
+// ============================================================
+
+model EngagementTemplate {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId  String   @map("organization_id") @db.Uuid
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  category        String   // "appreciation", "price_inquiry", "emoji_only", etc.
+  platform        String?  // null = all platforms
+  triggers        String[] // keywords/patterns that activate this template
+  responses       String[] // pool of responses (one is picked randomly for variety)
+  isActive        Boolean  @default(true) @map("is_active")
+  useCount        Int      @default(0) @map("use_count")
+  successRate     Float?   @map("success_rate") // updated by self-evaluation agent
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@index([organizationId, category])
 }

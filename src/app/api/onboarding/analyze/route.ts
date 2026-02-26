@@ -4,6 +4,7 @@ import { OnboardingIntelligenceAgent } from "@/agents/onboarding-intelligence";
 import { prisma } from "@/lib/prisma";
 import { createGoal, proposeGoalTargets } from "@/lib/goals/tracker";
 import type { GoalType } from "@/lib/goals/tracker";
+import { seedDefaultTemplates } from "@/lib/caching";
 
 export async function POST(request: NextRequest) {
   try {
@@ -55,6 +56,14 @@ export async function POST(request: NextRequest) {
             role: "OWNER",
           },
         });
+
+        // Seed default engagement templates for the new org
+        try {
+          await seedDefaultTemplates(newOrg.id);
+        } catch (templateError) {
+          console.error("Error seeding templates:", templateError);
+          // Don't fail onboarding if template seeding fails
+        }
         
         organizationId = newOrg.id;
       }

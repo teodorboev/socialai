@@ -49,6 +49,10 @@ Respond with a single JSON object. No markdown, no backticks.`;
       maxTokens: 3000,
     });
 
+    if (!text) {
+      throw new Error("No text response from Claude");
+    }
+
     let parsed: TrendReport;
     try {
       const jsonMatch = text.match(/\{[\s\S]*\}/);

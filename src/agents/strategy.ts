@@ -68,6 +68,10 @@ export class StrategyAgent extends BaseAgent {
       maxTokens: 6000,
     });
 
+    if (!text) {
+      throw new Error("No text response from Claude");
+    }
+
     // Parse the JSON response
     let parsed: StrategyPlan;
     try {

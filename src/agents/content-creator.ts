@@ -1,6 +1,5 @@
 import { z } from "zod";
-import { BaseAgent, type AgentResult } from "./shared/base-agent";
-import type { AgentName, Platform, ContentType, MediaType } from "@prisma/client";
+import { BaseAgent, type AgentResult, type OrgContext } from "./shared/base-agent";
 
 const ContentOutputSchema = z.object({
   caption: z.string().min(1).max(2200),
@@ -17,7 +16,7 @@ type ContentOutput = z.infer<typeof ContentOutputSchema>;
 
 export interface ContentCreatorInput {
   organizationId: string;
-  platform: Platform;
+  platform: string;
   brandConfig: {
     brandName: string;
     voiceTone: {
@@ -67,18 +66,141 @@ export class ContentCreatorAgent extends BaseAgent {
     super("CONTENT_CREATOR");
   }
 
+  /**
+   * STATIC: Brand voice, rules, platform guidelines - cached by Anthropic
+   * This is the bulk of the prompt and changes rarely.
+   */
+  protected getStaticSystemPrompt(orgContext: OrgContext): string {
+    const input = orgContext._input as ContentCreatorInput;
+    if (!input?.brandConfig) {
+      return "You are an expert social media content creator.";
+    }
+
+    const {
+      brandName,
+      voiceTone,
+      contentThemes,
+      doNots,
+      targetAudience,
+      hashtagStrategy,
+    } = input.brandConfig;
+
+    return `You are an expert social media content creator for ${brandName}.
+
+BRAND VOICE:
+- Adjectives: ${voiceTone.adjectives.join(", ")}
+- Examples of on-brand content:
+${voiceTone.examples.map((e) => `- ${e}`).join("\n")}
+- Things to avoid:
+${voiceTone.avoid.map((a) => `- ${a}`).join("\n")}
+
+TARGET AUDIENCE:
+${targetAudience.demographics ? `- Demographics: ${targetAudience.demographics}` : ""}
+${targetAudience.interests ? `- Interests: ${targetAudience.interests.join(", ")}` : ""}
+${targetAudience.painPoints ? `- Pain points: ${targetAudience.painPoints.join(", ")}` : ""}
+
+CONTENT THEMES: ${contentThemes.join(", ")}
+
+THINGS TO NEVER DO OR SAY:
+${doNots.map((d) => `- ${d}`).join("\n")}
+
+HASHTAG STRATEGY:
+${hashtagStrategy ? `
+- Always use: ${hashtagStrategy.always?.join(", ") || "none"}
+- Never use: ${hashtagStrategy.never?.join(", ") || "none"}
+- Rotate through: ${hashtagStrategy.rotating?.join(", ") || "none"}
+` : "Use relevant hashtags from your knowledge."}
+
+PLATFORM: ${input.platform}
+
+INSTRUCTIONS:
+1. Create ONE piece of content for ${input.platform} that is on-brand, engaging, and optimized for the platform.
+2. Match the brand voice exactly. The content should sound like it was written by the brand, not by AI.
+3. If DNA patterns are provided, engineer content that matches the winning combinations while varying from the avoid list.
+4. Include relevant hashtags based on the strategy.
+5. If visual content would enhance the post, include a detailed media prompt.
+6. Rate your confidence (0-1) in how well this matches the brand voice and will perform.
+7. Provide brief reasoning for your choices.
+
+Respond with a JSON object matching this schema exactly.`;
+  }
+
+  /**
+   * DYNAMIC: Current date, trends, recent context - NOT cached, changes every call
+   */
+  protected getDynamicSystemPromptContext(orgContext: OrgContext): string {
+    const input = orgContext._input as ContentCreatorInput;
+    if (!input) return "";
+
+    const today = new Date().toISOString().split("T")[0];
+    const parts: string[] = [`Today is ${today}.`];
+
+    if (input.contentPlanContext) {
+      parts.push(`CURRENT CONTENT PLAN CONTEXT:\n${input.contentPlanContext}`);
+    }
+
+    if (input.trendContext) {
+      parts.push(`TRENDING TOPICS TO CONSIDER:\n${input.trendContext}`);
+    }
+
+    if (input.previousTopPerformers?.length) {
+      parts.push(`TOP PERFORMING CONTENT (use as inspiration for style/format):\n${input.previousTopPerformers.map((p) => `- ${p.caption} (${p.engagementRate}% engagement)`).join("\n")}`);
+    }
+
+    if (input.dnaContext) {
+      parts.push(`
+DNA WINNING PATTERNS (engineer content matching these formulas):
+Based on ${input.dnaContext.stats.totalPosts} posts analyzed:
+- Historical hit rate: ${(input.dnaContext.stats.hitRate * 100).toFixed(1)}%
+- Average engagement: ${(input.dnaContext.stats.avgEngagement * 100).toFixed(1)}%
+
+WINNING COMBINATIONS (prioritize these):
+${input.dnaContext.recommendedHooks.length ? `- Hooks that worked: ${input.dnaContext.recommendedHooks.join(", ")}` : ""}
+${input.dnaContext.recommendedTopics.length ? `- Topics that resonated: ${input.dnaContext.recommendedTopics.join(", ")}` : ""}
+${input.dnaContext.recommendedAngles.length ? `- Angles that engaged: ${input.dnaContext.recommendedAngles.join(", ")}` : ""}
+
+AVOID (overused - high fatigue):
+${input.dnaContext.avoidHooks.length ? `- Hooks: ${input.dnaContext.avoidHooks.join(", ")}` : ""}
+${input.dnaContext.avoidTopics.length ? `- Topics: ${input.dnaContext.avoidTopics.join(", ")}` : ""}
+${input.dnaContext.avoidAngles.length ? `- Angles: ${input.dnaContext.avoidAngles.join(", ")}` : ""}
+
+BEST POSTING TIMES:
+${input.dnaContext.recommendedDays.length ? `- Days: ${input.dnaContext.recommendedDays.map(d => ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][d]).join(", ")}` : ""}
+${input.dnaContext.recommendedHours.length ? `- Hours: ${input.dnaContext.recommendedHours.join(", ")}` : ""}
+`);
+    }
+
+    return parts.join("\n\n");
+  }
+
   async execute(input: ContentCreatorInput): Promise<AgentResult<ContentOutput>> {
-    const systemPrompt = this.buildSystemPrompt(input);
-    const userMessage = this.buildUserMessage(input);
+    // Build org context with input for prompt building
+    const orgContext: OrgContext & { _input: ContentCreatorInput } = {
+      organizationId: input.organizationId,
+      platform: input.platform,
+      trainingContext: (input as any)._trainingContext,
+      memoryContext: (input as any)._memoryContext,
+      _input: input,
+    };
 
     try {
-      const { text, tokensUsed } = await this.callClaude({
-        system: systemPrompt,
-        userMessage,
+      // Use prompt caching with static/dynamic split (Layer 2)
+      const result = await this.callClaude<ContentOutput>({
+        system: { 
+          static: this.getStaticSystemPrompt(orgContext), 
+          dynamic: this.getDynamicSystemPromptContext(orgContext) 
+        },
+        userMessage: `Create a new ${input.platform} post. Make it authentic, engaging, and true to the brand voice.`,
         maxTokens: 2000,
+        organizationId: input.organizationId,
+        schema: ContentOutputSchema,
       });
 
-      const parsed = this.parseResponse(text);
+      if (!result.data) {
+        throw new Error("No structured data returned");
+      }
+
+      const parsed = result.data;
       const shouldEscalate = parsed.confidenceScore < 0.75;
 
       return {
@@ -89,7 +211,12 @@ export class ContentCreatorAgent extends BaseAgent {
         escalationReason: shouldEscalate
           ? `Content confidence too low (${parsed.confidenceScore}): ${parsed.reasoning}`
           : undefined,
-        tokensUsed,
+        tokensUsed: result.tokensUsed,
+        inputTokens: result.inputTokens,
+        outputTokens: result.outputTokens,
+        cacheSavings: result.cacheSavings,
+        cacheReadTokens: result.cacheReadTokens,
+        cacheWriteTokens: result.cacheWriteTokens,
       };
     } catch (error) {
       return {
@@ -102,6 +229,7 @@ export class ContentCreatorAgent extends BaseAgent {
     }
   }
 
+  // Keep original methods for backward compatibility
   private buildSystemPrompt(input: ContentCreatorInput): string {
     const {
       brandName,

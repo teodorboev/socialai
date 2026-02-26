@@ -20,6 +20,10 @@ export class AudienceIntelligenceAgent extends BaseAgent {
       maxTokens: 4000,
     });
 
+    if (!text) {
+      throw new Error("No text response from Claude");
+    }
+
     const parsed = this.parseJsonResponse(text);
     const validated = AudienceReportSchema.parse(parsed);
 

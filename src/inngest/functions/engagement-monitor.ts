@@ -3,6 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { createSocialClient } from "@/lib/social/factory";
 import type { SocialAccount } from "@prisma/client";
 import { processEngagement } from "@/agents/engagement";
+import { checkEngagementChanged, type ActivitySnapshot } from "@/lib/caching/engagement-dedup";
+import { logCacheHit } from "@/lib/caching";
 
 export const engagementMonitor = inngest.createFunction(
   {
@@ -48,8 +50,8 @@ export const engagementMonitor = inngest.createFunction(
             updatedAt: new Date(account.updatedAt),
           } as SocialAccount);
 
-          // Fetch comments from recent posts
-          // For now, we'll get recent content and check for new comments
+          // LAYER 1: Engagement Scan Deduplication
+          // Build activity snapshot (lightweight - just IDs)
           const recentContent = await prisma.content.findMany({
             where: {
               socialAccountId: account.id,
@@ -60,6 +62,49 @@ export const engagementMonitor = inngest.createFunction(
             take: 10,
           });
 
+          const commentIds: string[] = [];
+          let mostRecentTimestamp = new Date();
+
+          for (const content of recentContent) {
+            if (!content.platformPostId) continue;
+            try {
+              const comments = await client.getComments(content.platformPostId);
+              for (const comment of comments) {
+                commentIds.push(comment.id);
+                if (comment.createdAt && new Date(comment.createdAt) > mostRecentTimestamp) {
+                  mostRecentTimestamp = new Date(comment.createdAt);
+                }
+              }
+            } catch {
+              // Platform API might fail, continue
+            }
+          }
+
+          // Create activity snapshot
+          const snapshot: ActivitySnapshot = {
+            commentIds,
+            dmIds: [],
+            mentionIds: [],
+            mostRecentTimestamp: mostRecentTimestamp.toISOString(),
+          };
+
+          // Check if activity changed since last scan
+          const dedupResult = await checkEngagementChanged(
+            account.organizationId,
+            account.platform,
+            snapshot
+          );
+
+          if (!dedupResult.changed) {
+            // Cache HIT - skip processing this time
+            await logCacheHit(account.organizationId, "engagement_dedup", {
+              agentName: "ENGAGEMENT",
+              platform: account.platform,
+            });
+            return { success: true, skipped: true, newEngagements: 0 };
+          }
+
+          // Cache MISS - proceed with full processing
           const newEngagements = [];
 
           for (const content of recentContent) {

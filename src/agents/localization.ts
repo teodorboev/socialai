@@ -81,6 +81,10 @@ Respond with JSON:
       maxTokens: 4000,
     });
 
+    if (!text) {
+      throw new Error("No text response from Claude");
+    }
+
     const parsed = this.parseJsonResponse(text);
     const validated = LocalizationOutputSchema.parse(parsed);
 

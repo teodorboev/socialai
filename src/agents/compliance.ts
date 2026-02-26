@@ -65,6 +65,10 @@ Respond with JSON:
       maxTokens: 2000,
     });
 
+    if (!text) {
+      throw new Error("No text response from Claude");
+    }
+
     const parsed = this.parseJsonResponse(text);
     const validated = ComplianceResultSchema.parse(parsed);
 

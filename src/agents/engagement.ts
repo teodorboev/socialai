@@ -3,6 +3,7 @@ import type { AgentName, Platform, EngagementType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { EngagementResponseSchema, type EngagementResponse } from "@/lib/ai/schemas/engagement";
 import { buildEngagementPrompt, shouldForceEscalate } from "@/lib/ai/prompts/engagement";
+import { tryTemplateResponse, logCacheHit } from "@/lib/caching";
 
 export interface EngagementInput {
   organizationId: string;
@@ -48,6 +49,40 @@ export class EngagementAgent extends BaseAgent {
   async execute(input: EngagementInput) {
     const { platform, brandConfig, engagement, conversationHistory } = input;
 
+    // LAYER 3: Try template short-circuit first
+    const templateResult = await tryTemplateResponse({
+      organizationId: input.organizationId,
+      platform: platform.toString(),
+      engagementBody: engagement.body,
+      engagementType: engagement.type as "COMMENT" | "DIRECT_MESSAGE" | "MENTION" | "REPLY",
+    });
+
+    if (templateResult.matched) {
+      // Template HIT - no LLM call needed
+      await logCacheHit(input.organizationId, "template_short_circuit", {
+        agentName: "ENGAGEMENT",
+        platform: platform.toString(),
+      });
+
+      return {
+        success: true,
+        data: {
+          response: templateResult.response,
+          shouldRespond: true,
+          sentiment: "POSITIVE" as const,
+          category: templateResult.category,
+          reasoning: `Template match (${templateResult.category})`,
+          confidenceScore: templateResult.confidence,
+        },
+        confidenceScore: templateResult.confidence,
+        shouldEscalate: false,
+        tokensUsed: 0, // Zero LLM tokens
+        cacheSavings: 0,
+      };
+    }
+
+    // Template MISS - proceed to Claude as normal (Layer 2 prompt caching applies here)
+
     const systemPrompt = buildEngagementPrompt({
       ...input,
       platform: platform.toString(),
@@ -64,6 +99,9 @@ export class EngagementAgent extends BaseAgent {
     // Parse the JSON response
     let parsed: EngagementResponse;
     try {
+      if (!text) {
+        throw new Error("No text response from Claude");
+      }
       const jsonMatch = text.match(/\{[\s\S]*\}/);
       if (!jsonMatch) {
         throw new Error("No JSON found in response");

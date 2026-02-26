@@ -100,6 +100,9 @@ export class AnalyticsAgent extends BaseAgent {
     // Parse the JSON response
     let parsed: AnalyticsReport;
     try {
+      if (!text) {
+        throw new Error("No text response from Claude");
+      }
       const jsonMatch = text.match(/\{[\s\S]*\}/);
       if (!jsonMatch) {
         throw new Error("No JSON found in response");

@@ -76,6 +76,10 @@ Create a hypothesis-driven experiment that will provide actionable insights.`;
         maxTokens: 2000,
       });
 
+      if (!text) {
+        throw new Error("No text response from Claude");
+      }
+
       const parsed = this.parseDesignResponse(text, experimentId);
       const shouldEscalate = parsed.confidenceScore < 0.7;
 
@@ -210,6 +214,10 @@ Respond with a JSON object matching the required schema.`;
         userMessage: `Generate a recommendation for experiment ${input.experimentId}.`,
         maxTokens: 1000,
       });
+
+      if (!text) {
+        throw new Error("No text response from Claude");
+      }
 
       const parsed = this.parseResultResponse(text, input.experimentId, controlAvg, variantAvg, improvement, pValue, isSignificant);
 
