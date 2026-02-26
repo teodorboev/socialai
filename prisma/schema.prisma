@@ -106,6 +106,15 @@ model OrgMember {
   @@map("org_members")
 }
 
+// Super Admins - platform-wide admin access
+model SuperAdmin {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String   @unique @map("user_id") // Maps to Supabase auth.users
+  addedAt   DateTime @default(now()) @map("added_at")
+
+  @@map("super_admins")
+}
+
 enum MemberRole {
   OWNER
   ADMIN

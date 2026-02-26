@@ -21,7 +21,7 @@ import {
   BarChart3,
   Users,
   Palette,
-  Settings,
+  Settings as SettingsIcon,
   AlertTriangle,
   Menu,
   LogOut,
@@ -37,6 +37,8 @@ import {
   FileSearch,
   Megaphone,
   Copy,
+  Settings,
+  Shield,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -74,6 +76,7 @@ export default function DashboardLayout({
   const supabase = createClient();
   const [open, setOpen] = useState(false);
   const [orgId, setOrgId] = useState<string | null>(null);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
 
   useEffect(() => {
     async function getOrgId() {
@@ -81,6 +84,14 @@ export default function DashboardLayout({
         data: { user },
       } = await supabase.auth.getUser();
       if (user) {
+        // Check if super admin
+        const { data: superAdmin } = await supabase
+          .from("super_admins")
+          .select("id")
+          .eq("user_id", user.id)
+          .single();
+        setIsSuperAdmin(!!superAdmin);
+
         const { data: orgMember } = await supabase
           .from("org_members")
           .select("organization_id")
@@ -113,7 +124,7 @@ export default function DashboardLayout({
             <Sparkles className="h-6 w-6 text-primary" />
             <span className="font-semibold">SocialAI</span>
           </div>
-          <SidebarContent pathname={pathname} onSignOut={handleSignOut} />
+          <SidebarContent pathname={pathname} onSignOut={handleSignOut} isSuperAdmin={isSuperAdmin} />
         </SheetContent>
       </Sheet>
 
@@ -124,7 +135,7 @@ export default function DashboardLayout({
           <span className="font-semibold">SocialAI</span>
         </div>
         <div className="flex flex-1 flex-col overflow-y-auto bg-white border-r">
-          <SidebarContent pathname={pathname} onSignOut={handleSignOut} />
+          <SidebarContent pathname={pathname} onSignOut={handleSignOut} isSuperAdmin={isSuperAdmin} />
         </div>
       </div>
 
@@ -146,9 +157,11 @@ export default function DashboardLayout({
 function SidebarContent({
   pathname,
   onSignOut,
+  isSuperAdmin,
 }: {
   pathname: string;
   onSignOut: () => void;
+  isSuperAdmin?: boolean;
 }) {
   return (
     <nav className="flex flex-1 flex-col gap-1 p-4">
@@ -170,6 +183,30 @@ function SidebarContent({
           </Link>
         );
       })}
+
+      {/* Admin link - only visible to super admins */}
+      {isSuperAdmin && (
+        <>
+          <div className="mt-4 pt-4 border-t">
+            <div className="px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              System
+            </div>
+          </div>
+          <Link
+            href="/admin"
+            className={cn(
+              "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+              pathname === "/admin"
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:bg-muted hover:text-foreground"
+            )}
+          >
+            <Shield className="h-5 w-5" />
+            Admin
+          </Link>
+        </>
+      )}
+
       <div className="mt-auto pt-4 border-t">
         <Button
           variant="ghost"
