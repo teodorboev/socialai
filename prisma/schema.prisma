@@ -1842,3 +1842,196 @@ model EngagementTemplate {
 
   @@index([organizationId, category])
 }
+
+// ============================================================
+// SMART ROUTER - LLM PROVIDERS (managed from admin UI)
+// ============================================================
+
+model LLMProvider {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name            String   @unique   // "anthropic", "openai", "google", "mistral", "deepseek"
+  displayName     String              // "Anthropic", "OpenAI", "Google Gemini"
+  isActive        Boolean  @default(true)
+  apiKeyEnvVar    String              // "ANTHROPIC_API_KEY" — references .env variable name
+  baseUrl         String?             // Custom endpoint if needed (for proxies, Azure OpenAI, etc.)
+  defaultHeaders  Json?               // Extra headers if needed
+  rateLimitRpm    Int?                // Requests per minute limit
+  rateLimitTpm    Int?                // Tokens per minute limit
+  healthStatus    String   @default("healthy") // "healthy", "degraded", "down"
+  lastHealthCheck DateTime?
+  models          LLMModel[]
+  sortOrder       Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("llm_providers")
+}
+
+// ============================================================
+// SMART ROUTER - MODELS (managed from admin UI — all pricing here)
+// ============================================================
+
+model LLMModel {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  providerId      String   @map("provider_id") @db.Uuid
+  provider        LLMProvider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  modelId         String              // "claude-sonnet-4-5-20250929", "gpt-4o-mini", "gemini-2.0-flash"
+  displayName     String              // "Claude Sonnet 4.5", "GPT-4o Mini", "Gemini 2.0 Flash"
+  isActive        Boolean  @default(true)
+
+  // Capability tier — drives routing decisions
+  tier            String              // "budget", "mid", "flagship"
+
+  // Pricing (per 1M tokens, in USD cents for precision)
+  inputPricePer1M   Int              // e.g., 300 = $3.00 per 1M input tokens
+  outputPricePer1M  Int              // e.g., 1500 = $15.00 per 1M output tokens
+  cachedInputPricePer1M Int?         // Prompt caching price if supported
+
+  // Capabilities (what this model is good at)
+  capabilities    String[]           // ["classification", "extraction", "generation", "reasoning", "coding", "vision", "json_mode", "tool_use"]
+
+  // Limits
+  maxInputTokens  Int                // Context window
+  maxOutputTokens Int                // Max output
+  supportsImages  Boolean @default(false)
+  supportsToolUse Boolean @default(false)
+  supportsJson    Boolean @default(false)
+  supportsStreaming Boolean @default(true)
+  supportsCaching Boolean @default(false)
+
+  // Performance characteristics (updated from actual usage data)
+  avgLatencyMs    Int?               // Measured average latency
+  reliability     Float?             // 0-1 success rate from last 1000 calls
+
+  // Routing priority within tier (lower = preferred)
+  priorityInTier  Int      @default(0)
+
+  routingRules    RoutingRule[]
+  sortOrder       Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([providerId, modelId])
+  @@index([tier, isActive])
+  @@map("llm_models")
+}
+
+// ============================================================
+// SMART ROUTER - ROUTING RULES (optional overrides)
+// ============================================================
+
+model RoutingRule {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name            String              // "Content Creator always uses Sonnet"
+  description     String?
+  isActive        Boolean  @default(true)
+  priority        Int      @default(0) // Higher = checked first
+
+  // Match conditions (any combination)
+  matchAgent      String?             // "CONTENT_CREATOR", "COMPLIANCE", etc.
+  matchTaskType   String?             // "classification", "generation", "analysis"
+  matchTier       String?             // "budget", "mid", "flagship"
+
+  // Route to specific model
+  targetModelId   String   @map("target_model_id") @db.Uuid
+  targetModel     LLMModel @relation(fields: [targetModelId], references: [id])
+
+  // Optional: override tier classification for this match
+  overrideTier    String?             // Force a tier regardless of classifier
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([isActive, priority])
+  @@map("routing_rules")
+}
+
+// ============================================================
+// SMART ROUTER - COST TRACKING (every LLM call is logged)
+// ============================================================
+
+model LLMUsageLog {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId  String?  @map("organization_id") @db.Uuid // null for system-level calls
+  agentName       String              // Which agent made the call
+  pipelineId      String?  @map("pipeline_id") @db.Uuid // Which pipeline this was part of
+
+  // Request
+  requestTier     String              // "budget", "mid", "flagship" (classified)
+  taskType        String              // "classification", "generation", "analysis", etc.
+
+  // Model used
+  providerId      String   @map("provider_id")
+  providerName    String
+  modelId         String
+  modelDisplayName String
+
+  // Tokens
+  inputTokens     Int      @map("input_tokens")
+  outputTokens    Int      @map("output_tokens")
+  cachedTokens    Int      @default(0) @map("cached_tokens")
+  totalTokens     Int      @map("total_tokens")
+
+  // Cost (in USD cents)
+  inputCost       Int                 // Calculated from model pricing × tokens
+  outputCost      Int
+  cacheSavings    Int      @default(0) @map("cache_savings") // How much saved by caching
+  totalCost       Int                 // inputCost + outputCost - cacheSavings
+
+  // Performance
+  latencyMs       Int      @map("latency_ms")
+  wasRetry        Boolean  @default(false) @map("was_retry")
+  wasFallback     Boolean  @default(false) @map("was_fallback") // Used fallback provider
+  originalModelId String?  @map("original_model_id") // If fallback, what was the first choice
+
+  // Response quality (optional — filled by Self-Evaluation system)
+  qualityScore    Float?   @map("quality_score") // 0-1 if we have a way to evaluate
+
+  success         Boolean  @default(true)
+  errorMessage    String?  @map("error_message")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@index([organizationId, createdAt])
+  @@index([agentName, createdAt])
+  @@index([providerId, modelId, createdAt])
+  @@index([requestTier, createdAt])
+  @@index([createdAt])
+  @@map("llm_usage_logs")
+}
+
+// ============================================================
+// SMART ROUTER - DAILY COST AGGREGATION (for dashboard performance)
+// ============================================================
+
+model DailyCostSummary {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  date            DateTime @db.Date
+  organizationId  String?  @map("organization_id") @db.Uuid // null = platform-wide
+
+  totalCalls      Int      @map("total_calls")
+  totalInputTokens BigInt  @map("total_input_tokens")
+  totalOutputTokens BigInt @map("total_output_tokens")
+  totalCostCents  Int      @map("total_cost_cents")
+
+  // Breakdown by tier
+  budgetCalls     Int      @default(0) @map("budget_calls")
+  budgetCost      Int      @default(0) @map("budget_cost")
+  midCalls        Int      @default(0) @map("mid_calls")
+  midCost         Int      @default(0) @map("mid_cost")
+  flagshipCalls   Int      @default(0) @map("flagship_calls")
+  flagshipCost    Int      @default(0) @map("flagship_cost")
+
+  // Breakdown by provider
+  costByProvider  Json     @map("cost_by_provider")
+
+  // Breakdown by agent
+  costByAgent     Json     @map("cost_by_agent")
+
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@unique([date, organizationId])
+  @@index([date])
+  @@index([organizationId, date])
+  @@map("daily_cost_summaries")
+}
