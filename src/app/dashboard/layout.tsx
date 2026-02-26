@@ -80,6 +80,19 @@ export default function DashboardLayout({
 
   useEffect(() => {
     async function getOrgId() {
+      // Check sessionStorage first to avoid unnecessary calls
+      const cachedSuperAdmin = sessionStorage.getItem("isSuperAdmin");
+      const cachedOrgId = sessionStorage.getItem("orgId");
+
+      if (cachedSuperAdmin !== null) {
+        setIsSuperAdmin(cachedSuperAdmin === "true");
+      }
+
+      if (cachedOrgId !== null) {
+        setOrgId(cachedOrgId);
+        return;
+      }
+
       const {
         data: { user },
       } = await supabase.auth.getUser();
@@ -90,7 +103,10 @@ export default function DashboardLayout({
           .select("id")
           .eq("user_id", user.id)
           .single();
-        setIsSuperAdmin(!!superAdmin);
+        
+        const isSA = !!superAdmin;
+        setIsSuperAdmin(isSA);
+        sessionStorage.setItem("isSuperAdmin", String(isSA));
 
         const { data: orgMember } = await supabase
           .from("org_members")
@@ -99,6 +115,7 @@ export default function DashboardLayout({
           .single();
         if (orgMember) {
           setOrgId(orgMember.organization_id);
+          sessionStorage.setItem("orgId", orgMember.organization_id);
         }
       }
     }
