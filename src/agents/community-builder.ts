@@ -2,16 +2,28 @@ import { BaseAgent, AgentResult } from "./shared/base-agent";
 import { AgentName } from "@prisma/client";
 import { z } from "zod";
 import { CommunityBuilderSchema, CommunityBuilderInputSchema, type CommunityBuilderInput, type CommunityBuilder } from "@/lib/ai/schemas/community-builder";
+import { loadPrompt } from "@/lib/ai/prompts/loader";
 
 export class CommunityBuilderAgent extends BaseAgent {
   constructor() {
-    super("COMMUNITY_BUILDER", "claude-sonnet-4-20250514");
+    super("COMMUNITY_BUILDER");
+    this.setTaskType("generation");
   }
 
   async execute(input: CommunityBuilderInput): Promise<AgentResult<CommunityBuilder>> {
     const parsedInput = CommunityBuilderInputSchema.parse(input);
 
-    const systemPrompt = `You are a Community Building Expert specializing in growing and engaging social communities.
+    // Try to load prompt from DB first
+    let systemPrompt: string;
+    try {
+      systemPrompt = await loadPrompt("COMMUNITY_BUILDER", "main", {
+        brandName: parsedInput.brandName,
+        platforms: parsedInput.platforms.join(", "),
+        communityData: JSON.stringify(parsedInput.communityData || {}),
+      }, parsedInput.organizationId);
+    } catch {
+      // Fallback to inline prompt
+      systemPrompt = `You are a Community Building Expert specializing in growing and engaging social communities.
 
 Your role is to analyze the current community and develop strategies to build loyalty and advocacy.
 
@@ -37,28 +49,28 @@ COMMUNITY TYPES:
 
 Respond with a JSON object matching this schema:
 ${JSON.stringify(CommunityBuilderSchema.shape, null, 2)}`;
+    }
 
-    const response = await this.client.messages.create({
-      model: this.model,
-      max_tokens: 2500,
+    const { data, tokensUsed, inputTokens, outputTokens } = await this.callLLM<CommunityBuilder>({
       system: systemPrompt,
-      messages: [{ role: "user", content: `Build community strategy for ${parsedInput.brandName}.` }],
+      userMessage: `Build community strategy for ${parsedInput.brandName}.`,
+      maxTokens: 2500,
+      organizationId: parsedInput.organizationId,
+      schema: CommunityBuilderSchema,
     });
 
-    const textBlock = response.content.find((b) => b.type === "text");
-    if (!textBlock || textBlock.type !== "text") throw new Error("No text response");
-    const jsonMatch = textBlock.text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) throw new Error("No JSON found");
-
-    const parsed = CommunityBuilderSchema.parse(JSON.parse(jsonMatch[0]));
-    const tokensUsed = (response.usage?.input_tokens || 0) + (response.usage?.output_tokens || 0);
+    if (!data) {
+      throw new Error("Failed to parse community builder response");
+    }
 
     return {
       success: true,
-      data: parsed,
-      confidenceScore: parsed.confidenceScore,
-      shouldEscalate: parsed.confidenceScore < 0.5 || parsed.communityHealth.engagement < 0.1,
+      data,
+      confidenceScore: data.confidenceScore,
+      shouldEscalate: data.confidenceScore < 0.5 || data.communityHealth.engagement < 0.1,
       tokensUsed,
+      inputTokens,
+      outputTokens,
     };
   }
 }

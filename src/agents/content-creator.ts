@@ -212,15 +212,13 @@ ${input.dnaContext.recommendedHours.length ? `- Hours: ${input.dnaContext.recomm
     };
 
     try {
-      // Use prompt caching with static/dynamic split (Layer 2)
+      // Build system prompt (combining static and dynamic parts)
       const staticPart = await this.getStaticSystemPrompt(orgContext);
       const dynamicPart = this.getDynamicSystemPromptContext(orgContext);
+      const fullSystemPrompt = dynamicPart ? `${staticPart}\n\n${dynamicPart}` : staticPart;
       
-      const result = await this.callClaude<ContentOutput>({
-        system: { 
-          static: staticPart, 
-          dynamic: dynamicPart 
-        },
+      const result = await this.callLLM<ContentOutput>({
+        system: fullSystemPrompt,
         userMessage: `Create a new ${input.platform} post. Make it authentic, engaging, and true to the brand voice.`,
         maxTokens: 2000,
         organizationId: input.organizationId,
@@ -246,8 +244,6 @@ ${input.dnaContext.recommendedHours.length ? `- Hours: ${input.dnaContext.recomm
         inputTokens: result.inputTokens,
         outputTokens: result.outputTokens,
         cacheSavings: result.cacheSavings,
-        cacheReadTokens: result.cacheReadTokens,
-        cacheWriteTokens: result.cacheWriteTokens,
       };
     } catch (error) {
       return {

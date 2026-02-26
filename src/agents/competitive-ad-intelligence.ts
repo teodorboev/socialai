@@ -2,16 +2,30 @@ import { BaseAgent, AgentResult } from "./shared/base-agent";
 import { AgentName } from "@prisma/client";
 import { z } from "zod";
 import { CompetitiveAdIntelligenceSchema, CompetitiveAdIntelligenceInputSchema, type CompetitiveAdIntelligenceInput, type CompetitiveAdIntelligence } from "@/lib/ai/schemas/competitive-ad-intelligence";
+import { loadPrompt } from "@/lib/ai/prompts/loader";
 
 export class CompetitiveAdIntelligenceAgent extends BaseAgent {
   constructor() {
-    super("COMPETITIVE_AD_INTELLIGENCE", "claude-sonnet-4-20250514");
+    super("COMPETITIVE_AD_INTELLIGENCE");
+    this.setTaskType("analysis");
   }
 
   async execute(input: CompetitiveAdIntelligenceInput): Promise<AgentResult<CompetitiveAdIntelligence>> {
     const parsedInput = CompetitiveAdIntelligenceInputSchema.parse(input);
 
-    const systemPrompt = `You are a Competitive Advertising Intelligence Expert.
+    // Try to load prompt from DB first
+    let systemPrompt: string;
+    try {
+      systemPrompt = await loadPrompt("COMPETITIVE_AD_INTELLIGENCE", "main", {
+        brandName: parsedInput.brandName,
+        industry: parsedInput.industry,
+        competitors: parsedInput.competitors.join(", "),
+        platforms: parsedInput.platforms?.join(", ") || "All",
+        adLibraryData: JSON.stringify(parsedInput.adLibraryData || []),
+      }, parsedInput.organizationId);
+    } catch {
+      // Fallback to inline prompt
+      systemPrompt = `You are a Competitive Advertising Intelligence Expert.
 
 Your role is to analyze competitor ads and provide strategic recommendations.
 
@@ -32,28 +46,28 @@ ANALYSIS:
 
 Respond with a JSON object matching this schema:
 ${JSON.stringify(CompetitiveAdIntelligenceSchema.shape, null, 2)}`;
+    }
 
-    const response = await this.client.messages.create({
-      model: this.model,
-      max_tokens: 2500,
+    const { data, tokensUsed, inputTokens, outputTokens } = await this.callLLM<CompetitiveAdIntelligence>({
       system: systemPrompt,
-      messages: [{ role: "user", content: `Analyze competitor ads for ${parsedInput.brandName}.` }],
+      userMessage: `Analyze competitor ads for ${parsedInput.brandName}.`,
+      maxTokens: 2500,
+      organizationId: parsedInput.organizationId,
+      schema: CompetitiveAdIntelligenceSchema,
     });
 
-    const textBlock = response.content.find((b) => b.type === "text");
-    if (!textBlock || textBlock.type !== "text") throw new Error("No text response");
-    const jsonMatch = textBlock.text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) throw new Error("No JSON found");
-
-    const parsed = CompetitiveAdIntelligenceSchema.parse(JSON.parse(jsonMatch[0]));
-    const tokensUsed = (response.usage?.input_tokens || 0) + (response.usage?.output_tokens || 0);
+    if (!data) {
+      throw new Error("Failed to parse competitive ad intelligence response");
+    }
 
     return {
       success: true,
-      data: parsed,
-      confidenceScore: parsed.confidenceScore,
-      shouldEscalate: parsed.confidenceScore < 0.5,
+      data,
+      confidenceScore: data.confidenceScore,
+      shouldEscalate: data.confidenceScore < 0.5,
       tokensUsed,
+      inputTokens,
+      outputTokens,
     };
   }
 }
