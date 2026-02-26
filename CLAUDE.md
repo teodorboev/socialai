@@ -86,5 +86,6 @@ Read the relevant skill from `.claude/skills/` before implementing any feature:
 **Billing & Infrastructure:**
 - `.claude/skills/billing/SKILL.md` — Complete Stripe integration: multi-currency, plan management from admin UI, entitlements, dunning, webhooks. Controls which agents each plan can use via Orchestrator.
 - `.claude/skills/smart-router/SKILL.md` — **CRITICAL: ALL LLM calls go through SmartRouter.** Routes requests to optimal model by complexity: budget (70%), mid (20%), flagship (10%). Multi-provider (Anthropic, OpenAI, Google). Admin-managed pricing. Per-client cost tracking & profitability monitoring. Auto-fallback on provider failure.
+- `.claude/skills/platform-qa/SKILL.md` — **Run AFTER building any feature.** Full test suite (unit, integration, E2E), dead code removal, N+1 query detection, bundle optimization, flow tracing, and auto-generated documentation for every agent and pipeline. Covers mocks for SmartRouter, Stripe, Inngest, social APIs.
 
 All rules from AGENTS.md apply here. The user never runs terminal commands.

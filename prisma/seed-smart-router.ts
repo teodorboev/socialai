@@ -297,10 +297,10 @@ async function main() {
 
   // Gemini 2.5 Pro - $1.25 in / $10.00 out
   await prisma.lLMModel.upsert({
-    where: { providerId_modelId: { providerId: googleProvider.id, modelId: "gemini-2.5-pro" } },
+    where: { providerId_modelId: { providerId: googleProviderFinal!.id, modelId: "gemini-2.5-pro" } },
     update: {},
     create: {
-      providerId: googleProvider.id,
+      providerId: googleProviderFinal!.id,
       modelId: "gemini-2.5-pro",
       displayName: "Gemini 2.5 Pro",
       tier: "mid",
@@ -371,10 +371,10 @@ async function main() {
 
   // Gemini 2.5 Pro (flagship) - same model but in flagship tier for variety
   await prisma.lLMModel.upsert({
-    where: { providerId_modelId: { providerId: googleProvider.id, modelId: "gemini-2.5-pro-flagship" } },
+    where: { providerId_modelId: { providerId: googleProviderFinal!.id, modelId: "gemini-2.5-pro-flagship" } },
     update: {},
     create: {
-      providerId: googleProvider.id,
+      providerId: googleProviderFinal!.id,
       modelId: "gemini-2.5-pro-flagship",
       displayName: "Gemini 2.5 Pro (Extended)",
       tier: "flagship",

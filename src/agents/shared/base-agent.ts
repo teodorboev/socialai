@@ -1,4 +1,3 @@
-import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getTrainingContext } from "@/lib/training/prompt-injection";
@@ -19,6 +18,8 @@ import {
   loadPrompt,
   clearPromptCache 
 } from "@/lib/ai/prompts/loader";
+import { smartRouter, type SmartRouterRequest, type SmartRouterResponse } from "@/lib/router";
+import type { TaskType } from "@/lib/router/classifier";
 
 export interface AgentResult<T> {
   success: boolean;
@@ -57,14 +58,21 @@ export interface AgentInput {
 }
 
 export abstract class BaseAgent {
-  protected client: Anthropic;
   protected agentName: string;
-  protected model: string;
+  protected taskType: TaskType = "generation"; // Default task type for classification
 
-  constructor(agentName: string, model = "claude-sonnet-4-20250514") {
+  constructor(agentName: string, _model?: string) {
+    // Note: _model parameter is deprecated - SmartRouter now handles model selection
+    // Kept for backward compatibility with existing agents
     this.agentName = agentName;
-    this.model = model;
-    this.client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! });
+  }
+
+  /**
+   * Set the task type for this agent.
+   * Used by SmartRouter to classify requests into appropriate tiers.
+   */
+  protected setTaskType(taskType: TaskType): void {
+    this.taskType = taskType;
   }
 
   abstract execute(input: unknown): Promise<AgentResult<unknown>>;
@@ -217,31 +225,8 @@ export abstract class BaseAgent {
       const result = await this.execute(enrichedInput);
       const durationMs = Date.now() - startTime;
 
-      // Record cost event if tokens were used
-      if (result.tokensUsed && result.inputTokens && result.outputTokens) {
-        const costCents = this.calculateActualCost(result.inputTokens, result.outputTokens);
-        const now = new Date();
-        const period = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-        
-        try {
-          await prisma.agentCostEvent.create({
-            data: {
-              organizationId,
-              agentName: this.agentName,
-              inputTokens: result.inputTokens,
-              outputTokens: result.outputTokens,
-              totalTokens: result.tokensUsed,
-              costCents,
-              model: this.model,
-              contentId: (input as any)?._contentId,
-              pipelineRunId: (input as any)?._pipelineRunId,
-              period,
-            },
-          });
-        } catch (costError) {
-          console.error("Failed to record cost event:", costError);
-        }
-      }
+      // Note: Cost tracking is now handled automatically by SmartRouter
+      // via LLMUsageLog - no need for manual cost event recording
 
       await this.log(organizationId, {
         action: `${this.agentName}.execute`,
@@ -360,16 +345,20 @@ export abstract class BaseAgent {
   }
 
   /**
-   * Call Claude with support for prompt caching.
+   * Call LLM through SmartRouter.
+   * Automatically classifies request, routes to optimal model, handles fallbacks, and logs usage.
    * 
-   * @param params.system - Can be either:
-   *   - string: Plain system prompt (no caching)
-   *   - CachableBlock[]: System blocks with cache_control for prompt caching
-   *   - { static: string, dynamic?: string }: Convenience format that builds cached blocks
+   * @param params.system - System prompt
+   * @param params.userMessage - User message
+   * @param params.maxTokens - Max output tokens
+   * @param params.organizationId - For cost tracking
+   * @param params.contentId - For pipeline tracking
+   * @param params.pipelineRunId - For pipeline tracking
+   * @param params.schema - Optional Zod schema for structured output
    */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  protected async callClaude<T>(params: {
-    system: string | CachableBlock[] | { static: string; dynamic?: string };
+  protected async callLLM<T>(params: {
+    system: string;
     userMessage: string;
     maxTokens?: number;
     organizationId?: string;
@@ -384,126 +373,55 @@ export abstract class BaseAgent {
     inputTokens: number; 
     outputTokens: number;
     cacheSavings: number;
-    cacheReadTokens: number;
-    cacheWriteTokens: number;
+    modelInfo?: {
+      id: string;
+      displayName: string;
+      provider: string;
+      tier: string;
+    };
   }> {
-    // Convert system to the format expected by Anthropic
-    let systemParam: string | CachableBlock[] = "";
-    
-    if (Array.isArray(params.system)) {
-      // Already cached blocks
-      systemParam = params.system;
-    } else if (typeof params.system === "object" && "static" in params.system) {
-      // Convenience format: { static, dynamic }
-      systemParam = buildCachedSystemPrompt(params.system.static, params.system.dynamic);
-    } else {
-      // Plain string
-      systemParam = params.system;
-    }
-
-    const messageParams: Anthropic.MessageCreateParams = {
-      model: this.model,
-      max_tokens: params.maxTokens ?? 4096,
-      system: systemParam as string,
+    const request: SmartRouterRequest = {
+      agentName: this.agentName,
+      taskType: this.taskType,
       messages: [{ role: "user", content: params.userMessage }],
+      systemPrompt: params.system,
+      maxTokens: params.maxTokens,
+      organizationId: params.organizationId,
+      pipelineId: params.pipelineRunId,
     };
 
-    // Add tool for structured output if schema provided
-    if (params.schema) {
-      const { zodToJsonSchema } = await import("zod-to-json-schema");
-      
-      messageParams.tools = [{
-        name: "structured_output",
-        description: "Output structured data",
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        input_schema: zodToJsonSchema(params.schema) as any,
-      }];
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      messageParams.tool_choice = { type: "tool" as any, name: "structured_output" };
-    }
+    const response = await smartRouter.complete(request);
 
-    const response = await this.client.messages.create(messageParams);
-
+    // Extract text or structured data
     let text: string | undefined;
     let data: T | undefined;
-    let parsedInput: unknown;
 
     if (params.schema) {
-      // Handle structured output
-      const toolUse = response.content.find((c) => c.type === "tool_use");
-      if (toolUse && toolUse.type === "tool_use") {
-        parsedInput = toolUse.input;
-        data = params.schema.parse(parsedInput);
+      // Try to parse as structured output
+      try {
+        data = params.schema.parse(JSON.parse(response.content));
+      } catch {
+        // If parsing fails, treat as text
+        text = response.content;
       }
     } else {
-      // Handle text output
-      const textContent = response.content.find((c) => c.type === "text");
-      if (textContent && textContent.type === "text") {
-        text = textContent.text;
-      }
-    }
-
-    if (!text && !data) {
-      throw new Error("No valid response from Claude");
-    }
-
-    const inputTokens = response.usage?.input_tokens ?? 0;
-    const outputTokens = response.usage?.output_tokens ?? 0;
-    const tokensUsed = inputTokens + outputTokens;
-
-    // Extract cache stats
-    const cacheStats = extractCacheStats(response.usage);
-
-    // Calculate actual cost in cents using Claude pricing
-    const costCents = this.calculateActualCost(
-      inputTokens, 
-      outputTokens,
-      cacheStats.cacheReadTokens,
-      cacheStats.cacheWriteTokens
-    );
-
-    // Record the cost event with cache stats
-    if (params.organizationId) {
-      await this.recordCostEvent({
-        organizationId: params.organizationId,
-        inputTokens,
-        outputTokens,
-        totalTokens: tokensUsed,
-        costCents,
-        cacheReadTokens: cacheStats.cacheReadTokens,
-        cacheWriteTokens: cacheStats.cacheWriteTokens,
-        cacheSavingsUsd: cacheStats.estimatedSavingsUsd,
-        contentId: params.contentId,
-        pipelineRunId: params.pipelineRunId,
-      });
+      text = response.content;
     }
 
     return { 
       text, 
       data,
-      tokensUsed, 
-      inputTokens, 
-      outputTokens,
-      cacheSavings: cacheStats.estimatedSavingsUsd,
-      cacheReadTokens: cacheStats.cacheReadTokens,
-      cacheWriteTokens: cacheStats.cacheWriteTokens,
+      tokensUsed: response.usage.totalTokens, 
+      inputTokens: response.usage.inputTokens, 
+      outputTokens: response.usage.outputTokens,
+      cacheSavings: response.cost.cacheSavings / 100, // Convert cents to dollars for backward compat
+      modelInfo: response.model,
     };
   }
 
   /**
-   * Build cached system prompt from org context.
-   * Convenience method for agents that implement getStaticSystemPrompt.
-   * Can be async if getStaticSystemPrompt is async.
-   */
-  protected async buildCachedPrompt(orgContext: OrgContext): Promise<CachableBlock[]> {
-    const staticPart = await this.getStaticSystemPrompt(orgContext);
-    const dynamicPart = this.getDynamicSystemPromptContext?.(orgContext);
-    return buildCachedSystemPrompt(staticPart, dynamicPart);
-  }
-
-  /**
-   * Legacy callClaude for backward compatibility (no caching)
-   * @deprecated Use callClaude with system: { static, dynamic } for prompt caching
+   * Legacy callClaude for backward compatibility
+   * @deprecated Use callLLM which uses SmartRouter
    */
   protected async callClaudeLegacy({
     system,
@@ -520,105 +438,62 @@ export abstract class BaseAgent {
     contentId?: string;
     pipelineRunId?: string;
   }): Promise<{ text: string; tokensUsed: number; inputTokens: number; outputTokens: number }> {
-    const response = await this.client.messages.create({
-      model: this.model,
-      max_tokens: maxTokens,
+    const result = await this.callLLM({
       system,
-      messages: [{ role: "user", content: userMessage }],
+      userMessage,
+      maxTokens,
+      organizationId,
+      contentId,
+      pipelineRunId,
     });
 
-    const textContent = response.content.find((c) => c.type === "text");
-    
-    if (!textContent || textContent.type !== "text" || !textContent.text) {
-      throw new Error("No text response from Claude");
-    }
-
-    const inputTokens = response.usage?.input_tokens ?? 0;
-    const outputTokens = response.usage?.output_tokens ?? 0;
-    const tokensUsed = inputTokens + outputTokens;
-
-    // Calculate actual cost in cents using Claude pricing (Sonnet 4)
-    const costCents = this.calculateActualCost(inputTokens, outputTokens);
-
-    // Record the cost event
-    if (organizationId) {
-      await this.recordCostEvent({
-        organizationId,
-        inputTokens,
-        outputTokens,
-        totalTokens: tokensUsed,
-        costCents,
-        contentId,
-        pipelineRunId,
-      });
-    }
-
-    return { text: textContent.text, tokensUsed, inputTokens, outputTokens };
+    return { 
+      text: result.text || "", 
+      tokensUsed: result.tokensUsed, 
+      inputTokens: result.inputTokens, 
+      outputTokens: result.outputTokens 
+    };
   }
 
   /**
-   * Calculate actual cost using Claude API pricing (in cents)
-   * Includes cache pricing (cache reads are much cheaper)
+   * Build cached system prompt from org context.
+   * Convenience method for agents that implement getStaticSystemPrompt.
+   * Can be async if getStaticSystemPrompt is async.
    */
-  protected calculateActualCost(
-    inputTokens: number, 
-    outputTokens: number,
-    cacheReadTokens: number = 0,
-    cacheWriteTokens: number = 0
-  ): number {
-    // Sonnet 4 pricing
-    const inputCostPerMillion = 3.00;   // $3.00 per 1M tokens
-    const outputCostPerMillion = 15.00;  // $15.00 per 1M tokens
-    const cacheReadCostPerMillion = 0.30;  // $0.30 per 1M tokens
-    const cacheWriteCostPerMillion = 3.75; // $3.75 per 1M tokens
-    
-    const inputCost = (inputTokens / 1_000_000) * inputCostPerMillion;
-    const outputCost = (outputTokens / 1_000_000) * outputCostPerMillion;
-    const cacheReadCost = (cacheReadTokens / 1_000_000) * cacheReadCostPerMillion;
-    const cacheWriteCost = (cacheWriteTokens / 1_000_000) * cacheWriteCostPerMillion;
-    
-    // Return in cents
-    return (inputCost + outputCost + cacheReadCost + cacheWriteCost) * 100;
+  protected async buildCachedPrompt(orgContext: OrgContext): Promise<CachableBlock[]> {
+    const staticPart = await this.getStaticSystemPrompt(orgContext);
+    const dynamicPart = this.getDynamicSystemPromptContext?.(orgContext);
+    return buildCachedSystemPrompt(staticPart, dynamicPart);
   }
 
   /**
-   * Record cost event for billing analytics
+   * Backward-compatible alias for callLLM
+   * @deprecated Use callLLM which uses SmartRouter
    */
-  protected async recordCostEvent(params: {
-    organizationId: string;
-    inputTokens: number;
-    outputTokens: number;
-    totalTokens: number;
-    costCents: number;
-    cacheReadTokens?: number;
-    cacheWriteTokens?: number;
-    cacheSavingsUsd?: number;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  protected callClaude<T>(params: {
+    system: string;
+    userMessage: string;
+    maxTokens?: number;
+    organizationId?: string;
     contentId?: string;
     pipelineRunId?: string;
-  }): Promise<void> {
-    try {
-      const now = new Date();
-      const period = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-      
-      await prisma.agentCostEvent.create({
-        data: {
-          organizationId: params.organizationId,
-          agentName: this.agentName,
-          inputTokens: params.inputTokens,
-          outputTokens: params.outputTokens,
-          totalTokens: params.totalTokens,
-          costCents: params.costCents,
-          cacheReadTokens: params.cacheReadTokens ?? 0,
-          cacheWriteTokens: params.cacheWriteTokens ?? 0,
-          model: this.model,
-          contentId: params.contentId,
-          pipelineRunId: params.pipelineRunId,
-          period,
-        },
-      });
-    } catch (error) {
-      // Don't fail the agent if cost tracking fails
-      console.error("Failed to record cost event:", error);
-    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    schema?: any;
+  }): Promise<{ 
+    text?: string; 
+    data?: T;
+    tokensUsed: number; 
+    inputTokens: number; 
+    outputTokens: number;
+    cacheSavings: number;
+    modelInfo?: {
+      id: string;
+      displayName: string;
+      provider: string;
+      tier: string;
+    };
+  }> {
+    return this.callLLM(params);
   }
 }
