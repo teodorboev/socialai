@@ -2,16 +2,27 @@ import { BaseAgent, AgentResult } from "./shared/base-agent";
 import { AgentName } from "@prisma/client";
 import { z } from "zod";
 import { PredictiveContentSchema, PredictiveContentInputSchema, type PredictiveContentInput, type PredictiveContent } from "@/lib/ai/schemas/predictive-content";
+import { loadPrompt } from "@/lib/ai/prompts/loader";
 
 export class PredictiveContentAgent extends BaseAgent {
   constructor() {
-    super("PREDICTIVE_CONTENT", "claude-sonnet-4-20250514");
+    super("PREDICTIVE_CONTENT");
+    this.setTaskType("analysis");
   }
 
   async execute(input: PredictiveContentInput): Promise<AgentResult<PredictiveContent>> {
     const parsedInput = PredictiveContentInputSchema.parse(input);
 
-    const systemPrompt = `You are a Content Performance Prediction Expert specializing in social media analytics.
+    let systemPrompt: string;
+    try {
+      systemPrompt = await loadPrompt("PREDICTIVE_CONTENT", "main", {
+        brandName: parsedInput.brandName,
+        contentOptions: JSON.stringify(parsedInput.contentOptions),
+        historicalData: JSON.stringify(parsedInput.historicalData || {}),
+        context: JSON.stringify(parsedInput.context || {}),
+      }, parsedInput.organizationId);
+    } catch {
+      systemPrompt = `You are a Content Performance Prediction Expert specializing in social media analytics.
 
 Your role is to predict how content will perform before it's published, helping optimize for maximum engagement and ROI.
 
@@ -49,45 +60,32 @@ IMPORTANT:
 
 Respond with a JSON object matching this schema:
 ${JSON.stringify(PredictiveContentSchema.shape, null, 2)}`;
+    }
 
-    const response = await this.client.messages.create({
-      model: this.model,
-      max_tokens: 3000,
+    const { data, tokensUsed, inputTokens, outputTokens } = await this.callLLM<PredictiveContent>({
       system: systemPrompt,
-      messages: [
-        {
-          role: "user",
-          content: `Predict performance for ${parsedInput.contentOptions.length} content options for ${parsedInput.brandName}.`,
-        },
-      ],
+      userMessage: `Predict performance for ${parsedInput.contentOptions.length} content options for ${parsedInput.brandName}.`,
+      maxTokens: 3000,
+      organizationId: parsedInput.organizationId,
+      schema: PredictiveContentSchema,
     });
 
-    const textBlock = response.content.find((b) => b.type === "text");
-    if (!textBlock || textBlock.type !== "text") {
-      throw new Error("No text response from Claude");
-    }
+    if (!data) throw new Error("Failed to parse predictive content response");
 
-    const jsonMatch = textBlock.text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      throw new Error("No JSON found in response");
-    }
-
-    const parsed = PredictiveContentSchema.parse(JSON.parse(jsonMatch[0]));
-    const tokensUsed = (response.usage?.input_tokens || 0) + (response.usage?.output_tokens || 0);
-
-    // Determine if we should escalate
-    const hasLowConfidence = parsed.predictions.some(p => p.confidenceScore < 0.5);
-    const shouldEscalate = parsed.confidenceScore < 0.5 || hasLowConfidence;
+    const hasLowConfidence = data.predictions.some(p => p.confidenceScore < 0.5);
+    const shouldEscalate = data.confidenceScore < 0.5 || hasLowConfidence;
 
     return {
       success: true,
-      data: parsed,
-      confidenceScore: parsed.confidenceScore,
+      data,
+      confidenceScore: data.confidenceScore,
       shouldEscalate,
       escalationReason: shouldEscalate
-        ? `Low confidence score (${parsed.confidenceScore}): Insufficient historical data for accurate predictions`
+        ? `Low confidence score (${data.confidenceScore}): Insufficient historical data for accurate predictions`
         : undefined,
       tokensUsed,
+      inputTokens,
+      outputTokens,
     };
   }
 }

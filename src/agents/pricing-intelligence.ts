@@ -2,16 +2,27 @@ import { BaseAgent, AgentResult } from "./shared/base-agent";
 import { AgentName } from "@prisma/client";
 import { z } from "zod";
 import { PricingIntelligenceSchema, PricingIntelligenceInputSchema, type PricingIntelligenceInput, type PricingIntelligence } from "@/lib/ai/schemas/pricing-intelligence";
+import { loadPrompt } from "@/lib/ai/prompts/loader";
 
 export class PricingIntelligenceAgent extends BaseAgent {
   constructor() {
-    super("PRICING_INTELLIGENCE", "claude-sonnet-4-20250514");
+    super("PRICING_INTELLIGENCE");
+    this.setTaskType("analysis");
   }
 
   async execute(input: PricingIntelligenceInput): Promise<AgentResult<PricingIntelligence>> {
     const parsedInput = PricingIntelligenceInputSchema.parse(input);
 
-    const systemPrompt = `You are a Pricing Intelligence Expert specializing in competitive pricing analysis.
+    let systemPrompt: string;
+    try {
+      systemPrompt = await loadPrompt("PRICING_INTELLIGENCE", "main", {
+        brandName: parsedInput.brandName,
+        products: parsedInput.products.map(p => `${p.name}: $${p.currentPrice}`).join("\n"),
+        competitors: parsedInput.competitors ? JSON.stringify(parsedInput.competitors) : "",
+        marketData: JSON.stringify(parsedInput.marketData || {}),
+      }, parsedInput.organizationId);
+    } catch {
+      systemPrompt = `You are a Pricing Intelligence Expert specializing in competitive pricing analysis.
 
 Your role is to analyze competitor pricing and provide pricing recommendations.
 
@@ -35,28 +46,26 @@ ANALYSIS FRAMEWORK:
 
 Respond with a JSON object matching this schema:
 ${JSON.stringify(PricingIntelligenceSchema.shape, null, 2)}`;
+    }
 
-    const response = await this.client.messages.create({
-      model: this.model,
-      max_tokens: 2500,
+    const { data, tokensUsed, inputTokens, outputTokens } = await this.callLLM<PricingIntelligence>({
       system: systemPrompt,
-      messages: [{ role: "user", content: `Analyze pricing for ${parsedInput.brandName}.` }],
+      userMessage: `Analyze pricing for ${parsedInput.brandName}.`,
+      maxTokens: 2500,
+      organizationId: parsedInput.organizationId,
+      schema: PricingIntelligenceSchema,
     });
 
-    const textBlock = response.content.find((b) => b.type === "text");
-    if (!textBlock || textBlock.type !== "text") throw new Error("No text response");
-    const jsonMatch = textBlock.text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) throw new Error("No JSON found");
-
-    const parsed = PricingIntelligenceSchema.parse(JSON.parse(jsonMatch[0]));
-    const tokensUsed = (response.usage?.input_tokens || 0) + (response.usage?.output_tokens || 0);
+    if (!data) throw new Error("Failed to parse pricing intelligence response");
 
     return {
       success: true,
-      data: parsed,
-      confidenceScore: parsed.confidenceScore,
-      shouldEscalate: parsed.confidenceScore < 0.5,
+      data,
+      confidenceScore: data.confidenceScore,
+      shouldEscalate: data.confidenceScore < 0.5,
       tokensUsed,
+      inputTokens,
+      outputTokens,
     };
   }
 }
