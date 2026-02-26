@@ -15,6 +15,8 @@ import {
   Users,
   Receipt,
   BarChart3,
+  Brain,
+  DollarSign,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -27,6 +29,11 @@ const billingNav = [
   { name: "Clients", href: "/admin/billing/clients", icon: Users },
   { name: "Events", href: "/admin/billing/events", icon: Receipt },
   { name: "Usage", href: "/admin/billing/usage", icon: BarChart3 },
+];
+
+const llmNav = [
+  { name: "LLM Models", href: "/admin/llm-models", icon: Brain },
+  { name: "Cost Dashboard", href: "/admin/cost", icon: DollarSign },
 ];
 
 const systemNav = [
@@ -83,6 +90,32 @@ export default function AdminLayout({
             </div>
             {billingNav.map((item) => {
               const isActive = pathname === item.href || 
+                (item.href !== "/admin" && pathname.startsWith(item.href));
+              return (
+                <Link
+                  key={item.name}
+                  href={item.href}
+                  className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                    isActive
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                  )}
+                >
+                  <item.icon className="h-5 w-5" />
+                  {item.name}
+                </Link>
+              );
+            })}
+
+            {/* LLM Section */}
+            <div className="pt-4 pb-2">
+              <div className="px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                LLM / Smart Router
+              </div>
+            </div>
+            {llmNav.map((item) => {
+              const isActive = pathname === item.href ||
                 (item.href !== "/admin" && pathname.startsWith(item.href));
               return (
                 <Link

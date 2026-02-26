@@ -2,16 +2,29 @@ import { BaseAgent, AgentResult } from "./shared/base-agent";
 import { AgentName } from "@prisma/client";
 import { z } from "zod";
 import { BrandVoiceGuardianSchema, BrandVoiceGuardianInputSchema, type BrandVoiceGuardianInput, type BrandVoiceGuardian } from "@/lib/ai/schemas/brand-voice-guardian";
+import { loadPrompt } from "@/lib/ai/prompts/loader";
 
 export class BrandVoiceGuardianAgent extends BaseAgent {
   constructor() {
-    super("BRAND_VOICE_GUARDIAN", "claude-sonnet-4-20250514");
+    super("BRAND_VOICE_GUARDIAN");
+    this.setTaskType("analysis");
   }
 
   async execute(input: BrandVoiceGuardianInput): Promise<AgentResult<BrandVoiceGuardian>> {
     const parsedInput = BrandVoiceGuardianInputSchema.parse(input);
 
-    const systemPrompt = `You are a Brand Voice Guardian - an expert in maintaining consistent brand identity across all content.
+    // Try to load prompt from DB first
+    let systemPrompt: string;
+    try {
+      systemPrompt = await loadPrompt("BRAND_VOICE_GUARDIAN", "main", {
+        brandName: parsedInput.brandName,
+        brandVoice: JSON.stringify(parsedInput.brandVoice),
+        targetAudience: JSON.stringify(parsedInput.targetAudience || {}),
+        contentCount: String(parsedInput.contentToAnalyze.length),
+      }, parsedInput.organizationId);
+    } catch {
+      // Fallback to inline prompt
+      systemPrompt = `You are a Brand Voice Guardian - an expert in maintaining consistent brand identity across all content.
 
 Your role is to analyze content against the defined brand voice guidelines and ensure consistency.
 
@@ -47,45 +60,33 @@ VIOLATION TYPES:
 
 Respond with a JSON object matching this schema:
 ${JSON.stringify(BrandVoiceGuardianSchema.shape, null, 2)}`;
+    }
 
-    const response = await this.client.messages.create({
-      model: this.model,
-      max_tokens: 3000,
+    const { data, tokensUsed, inputTokens, outputTokens } = await this.callLLM<BrandVoiceGuardian>({
       system: systemPrompt,
-      messages: [
-        {
-          role: "user",
-          content: `Analyze ${parsedInput.contentToAnalyze.length} content pieces for brand voice consistency for ${parsedInput.brandName}.`,
-        },
-      ],
+      userMessage: `Analyze ${parsedInput.contentToAnalyze.length} content pieces for brand voice consistency for ${parsedInput.brandName}.`,
+      maxTokens: 3000,
+      organizationId: parsedInput.organizationId,
+      schema: BrandVoiceGuardianSchema,
     });
 
-    const textBlock = response.content.find((b) => b.type === "text");
-    if (!textBlock || textBlock.type !== "text") {
-      throw new Error("No text response from Claude");
+    if (!data) {
+      throw new Error("Failed to parse brand voice guardian response");
     }
 
-    const jsonMatch = textBlock.text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      throw new Error("No JSON found in response");
-    }
-
-    const parsed = BrandVoiceGuardianSchema.parse(JSON.parse(jsonMatch[0]));
-    const tokensUsed = (response.usage?.input_tokens || 0) + (response.usage?.output_tokens || 0);
-
-    // Escalate if there are major violations
-    const hasMajorViolations = parsed.violations.some(v => v.severity === "major");
-    const shouldEscalate = hasMajorViolations || parsed.confidenceScore < 0.5;
+    const shouldEscalate = data.confidenceScore < 0.5;
 
     return {
       success: true,
-      data: parsed,
-      confidenceScore: parsed.confidenceScore,
+      data,
+      confidenceScore: data.confidenceScore,
       shouldEscalate,
       escalationReason: shouldEscalate
-        ? `Major brand voice violations detected or low confidence (${parsed.confidenceScore})`
+        ? `Low confidence score (${data.confidenceScore})`
         : undefined,
       tokensUsed,
+      inputTokens,
+      outputTokens,
     };
   }
 }

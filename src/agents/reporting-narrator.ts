@@ -10,7 +10,7 @@ import {
 
 export class ReportingNarratorAgent extends BaseAgent {
   constructor() {
-    super("REPORTING_NARRATOR", "claude-sonnet-4-20250514");
+    super("REPORTING_NARRATOR");
   }
 
   async execute(input: ReportingNarratorInput): Promise<AgentResult<ReportingNarrator>> {
@@ -66,42 +66,28 @@ INSTRUCTIONS:
 Respond with a JSON object matching this schema:
 ${JSON.stringify(ReportingNarratorSchema.shape, null, 2)}`;
 
-    const response = await this.client.messages.create({
-      model: this.model,
-      max_tokens: 3500,
+    const result = await this.callLLM<ReportingNarrator>({
       system: systemPrompt,
-      messages: [
-        {
-          role: "user",
-          content: `Create a ${parsedInput.period.type.toLowerCase()} performance report narrative for ${parsedInput.reportAudience.toLowerCase()} audience.`,
-        },
-      ],
+      userMessage: `Create a ${parsedInput.period.type.toLowerCase()} performance report narrative for ${parsedInput.reportAudience.toLowerCase()} audience.`,
+      schema: ReportingNarratorSchema,
+      maxTokens: 3500,
     });
 
-    const textBlock = response.content.find((b) => b.type === "text");
-    if (!textBlock || textBlock.type !== "text") {
-      throw new Error("No text response from Claude");
+    if (!result.data) {
+      throw new Error("Failed to generate structured report narrative");
     }
 
-    const jsonMatch = textBlock.text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      throw new Error("No JSON found in response");
-    }
-
-    const parsed = ReportingNarratorSchema.parse(JSON.parse(jsonMatch[0]));
-    const tokensUsed = (response.usage?.input_tokens || 0) + (response.usage?.output_tokens || 0);
-
-    const shouldEscalate = parsed.confidenceScore < 0.6;
+    const shouldEscalate = result.data.confidenceScore < 0.6;
 
     return {
       success: true,
-      data: parsed,
-      confidenceScore: parsed.confidenceScore,
+      data: result.data,
+      confidenceScore: result.data.confidenceScore,
       shouldEscalate,
       escalationReason: shouldEscalate
-        ? `Low confidence score (${parsed.confidenceScore}): Report may lack sufficient data for accurate analysis`
+        ? `Low confidence score (${result.data.confidenceScore}): Report may lack sufficient data for accurate analysis`
         : undefined,
-      tokensUsed,
+      tokensUsed: result.tokensUsed,
     };
   }
 }

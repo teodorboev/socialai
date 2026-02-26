@@ -70,17 +70,19 @@ Organization: ${input.organizationId}
 Create a hypothesis-driven experiment that will provide actionable insights.`;
 
     try {
-      const { text, tokensUsed } = await this.callClaude({
+      const result = await this.callLLM<ExperimentDesign>({
         system: systemPrompt,
         userMessage,
         maxTokens: 2000,
+        schema: ExperimentDesignSchema,
       });
 
-      if (!text) {
-        throw new Error("No text response from Claude");
+      if (!result.data) {
+        throw new Error("No structured data returned from LLM");
       }
 
-      const parsed = this.parseDesignResponse(text, experimentId);
+      // Add experimentId to the result
+      const parsed = { ...result.data, experimentId };
       const shouldEscalate = parsed.confidenceScore < 0.7;
 
       return {
@@ -89,7 +91,7 @@ Create a hypothesis-driven experiment that will provide actionable insights.`;
         confidenceScore: parsed.confidenceScore,
         shouldEscalate,
         escalationReason: shouldEscalate ? `Low confidence in experiment design: ${parsed.hypothesis}` : undefined,
-        tokensUsed,
+        tokensUsed: result.tokensUsed,
       };
     } catch (error) {
       return {
@@ -209,24 +211,34 @@ RULES:
 Respond with a JSON object matching the required schema.`;
 
     try {
-      const { text, tokensUsed } = await this.callClaude({
+      const result = await this.callLLM<ExperimentResult>({
         system: systemPrompt,
         userMessage: `Generate a recommendation for experiment ${input.experimentId}.`,
         maxTokens: 1000,
+        schema: ExperimentResultSchema,
       });
 
-      if (!text) {
-        throw new Error("No text response from Claude");
+      if (!result.data) {
+        throw new Error("No structured data returned from LLM");
       }
 
-      const parsed = this.parseResultResponse(text, input.experimentId, controlAvg, variantAvg, improvement, pValue, isSignificant);
+      const parsed = {
+        ...result.data,
+        experimentId: input.experimentId,
+        status,
+        controlMetric: controlAvg,
+        variantMetric: variantAvg,
+        improvement,
+        statisticalSignificance: pValue,
+        isSignificant,
+      };
 
       return {
         success: true,
         data: parsed,
         confidenceScore: parsed.confidenceScore,
         shouldEscalate: parsed.confidenceScore < 0.6,
-        tokensUsed,
+        tokensUsed: result.tokensUsed,
       };
     } catch (error) {
       return {

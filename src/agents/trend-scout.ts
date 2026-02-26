@@ -63,42 +63,35 @@ Respond with a single JSON object. No markdown, no backticks.`;
       connectedPlatforms,
     };
 
-    const systemPrompt = await this.buildCachedPrompt(orgContext);
+    const cachedBlocks = await this.buildCachedPrompt(orgContext);
+    const systemPrompt = cachedBlocks.map(b => b.text).join("\n\n");
 
-    const { text, tokensUsed } = await this.callClaude({
+    const result = await this.callLLM<TrendReport>({
       system: systemPrompt,
       userMessage: `Identify the top 5-10 trends for ${brandConfig.brandName} this week. Include relevant hashtags and content angles.`,
+      schema: TrendReportSchema,
       maxTokens: 3000,
     });
 
-    if (!text) {
-      throw new Error("No text response from Claude");
-    }
-
-    let parsed: TrendReport;
-    try {
-      const jsonMatch = text.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) {
-        throw new Error("No JSON found in response");
-      }
-      parsed = TrendReportSchema.parse(JSON.parse(jsonMatch[0]));
-    } catch (parseError) {
-      console.error("Failed to parse trend report:", parseError, text);
+    if (!result.data) {
+      console.error("Failed to parse trend report");
       return {
         success: false,
         confidenceScore: 0,
         shouldEscalate: true,
         escalationReason: "Failed to parse AI response",
-        tokensUsed,
+        tokensUsed: result.tokensUsed,
       };
     }
+
+    const parsed = result.data;
 
     return {
       success: true,
       data: parsed,
       confidenceScore: parsed.confidenceScore,
       shouldEscalate: parsed.confidenceScore < 0.6,
-      tokensUsed,
+      tokensUsed: result.tokensUsed,
     };
   }
 }

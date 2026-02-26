@@ -7,16 +7,31 @@ import {
   type CrisisResponseInput,
   type CrisisResponse,
 } from "@/lib/ai/schemas/crisis-response";
+import { loadPrompt } from "@/lib/ai/prompts/loader";
 
 export class CrisisResponseAgent extends BaseAgent {
   constructor() {
-    super("CRISIS_RESPONSE", "claude-sonnet-4-20250514");
+    super("CRISIS_RESPONSE");
+    this.setTaskType("reasoning");
   }
 
   async execute(input: CrisisResponseInput): Promise<AgentResult<CrisisResponse>> {
     const parsedInput = CrisisResponseInputSchema.parse(input);
 
-    const systemPrompt = `You are a Crisis Management Expert specializing in social media crisis response.
+    // Try to load prompt from DB first
+    let systemPrompt: string;
+    try {
+      systemPrompt = await loadPrompt("CRISIS_RESPONSE", "main", {
+        organizationId: parsedInput.organizationId,
+        crisisType: parsedInput.crisisType,
+        sentiment: JSON.stringify(parsedInput.sentiment),
+        mentions: JSON.stringify(parsedInput.mentions.slice(0, 10)),
+        affectedProducts: parsedInput.affectedProducts?.join(", ") || "",
+        brandVoice: parsedInput.brandVoice ? JSON.stringify(parsedInput.brandVoice) : "",
+      }, parsedInput.organizationId);
+    } catch {
+      // Fallback to inline prompt
+      systemPrompt = `You are a Crisis Management Expert specializing in social media crisis response.
 
 Your role is to assess crisis situations and provide strategic response plans to protect brand reputation.
 
@@ -55,43 +70,33 @@ INSTRUCTIONS:
 
 Respond with a JSON object matching this schema:
 ${JSON.stringify(CrisisResponseSchema.shape, null, 2)}`;
+    }
 
-    const response = await this.client.messages.create({
-      model: this.model,
-      max_tokens: 3000,
+    const { data, tokensUsed, inputTokens, outputTokens } = await this.callLLM<CrisisResponse>({
       system: systemPrompt,
-      messages: [
-        {
-          role: "user",
-          content: `Analyze this crisis situation for ${parsedInput.organizationId} and provide a comprehensive response strategy. Crisis type: ${parsedInput.crisisType}`,
-        },
-      ],
+      userMessage: `Analyze this crisis situation for ${parsedInput.organizationId} and provide a comprehensive response strategy. Crisis type: ${parsedInput.crisisType}`,
+      maxTokens: 3000,
+      organizationId: parsedInput.organizationId,
+      schema: CrisisResponseSchema,
     });
 
-    const textBlock = response.content.find((b) => b.type === "text");
-    if (!textBlock || textBlock.type !== "text") {
-      throw new Error("No text response from Claude");
+    if (!data) {
+      throw new Error("Failed to parse crisis response");
     }
 
-    const jsonMatch = textBlock.text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      throw new Error("No JSON found in response");
-    }
-
-    const parsed = CrisisResponseSchema.parse(JSON.parse(jsonMatch[0]));
-    const tokensUsed = (response.usage?.input_tokens || 0) + (response.usage?.output_tokens || 0);
-
-    const shouldEscalate = parsed.escalationNeeded.required || parsed.severity === "CRITICAL" || parsed.severity === "HIGH";
+    const shouldEscalate = data.escalationNeeded.required;
 
     return {
       success: true,
-      data: parsed,
-      confidenceScore: parsed.confidenceScore,
+      data,
+      confidenceScore: data.confidenceScore,
       shouldEscalate,
       escalationReason: shouldEscalate
-        ? `Crisis severity: ${parsed.severity}. Escalation ${parsed.escalationNeeded.required ? "required" : "recommended"} by agent.`
+        ? `Crisis requires escalation: ${data.escalationNeeded.reason}`
         : undefined,
       tokensUsed,
+      inputTokens,
+      outputTokens,
     };
   }
 }

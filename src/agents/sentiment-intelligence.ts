@@ -5,7 +5,7 @@ import { SentimentIntelligenceSchema, SentimentIntelligenceInputSchema, type Sen
 
 export class SentimentIntelligenceAgent extends BaseAgent {
   constructor() {
-    super("SENTIMENT_INTELLIGENCE", "claude-sonnet-4-20250514");
+    super("SENTIMENT_INTELLIGENCE");
   }
 
   async execute(input: SentimentIntelligenceInput): Promise<AgentResult<SentimentIntelligence>> {
@@ -48,45 +48,31 @@ CRITICAL ISSUES TO FLAG:
 Respond with a JSON object matching this schema:
 ${JSON.stringify(SentimentIntelligenceSchema.shape, null, 2)}`;
 
-    const response = await this.client.messages.create({
-      model: this.model,
-      max_tokens: 3000,
+    const result = await this.callLLM<SentimentIntelligence>({
       system: systemPrompt,
-      messages: [
-        {
-          role: "user",
-          content: `Perform deep sentiment analysis for ${parsedInput.brandName} across ${parsedInput.platforms.join(", ")}.`,
-        },
-      ],
+      userMessage: `Perform deep sentiment analysis for ${parsedInput.brandName} across ${parsedInput.platforms.join(", ")}.`,
+      schema: SentimentIntelligenceSchema,
+      maxTokens: 3000,
     });
 
-    const textBlock = response.content.find((b) => b.type === "text");
-    if (!textBlock || textBlock.type !== "text") {
-      throw new Error("No text response from Claude");
+    if (!result.data) {
+      throw new Error("Failed to generate structured sentiment analysis");
     }
-
-    const jsonMatch = textBlock.text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      throw new Error("No JSON found in response");
-    }
-
-    const parsed = SentimentIntelligenceSchema.parse(JSON.parse(jsonMatch[0]));
-    const tokensUsed = (response.usage?.input_tokens || 0) + (response.usage?.output_tokens || 0);
 
     // Escalate for critical issues or very negative sentiment
-    const hasCriticalIssues = parsed.emergingIssues.some(i => i.severity === "critical");
-    const isVeryNegative = parsed.overallSentiment.score < -0.5;
-    const shouldEscalate = hasCriticalIssues || isVeryNegative || parsed.confidenceScore < 0.5;
+    const hasCriticalIssues = result.data.emergingIssues.some(i => i.severity === "critical");
+    const isVeryNegative = result.data.overallSentiment.score < -0.5;
+    const shouldEscalate = hasCriticalIssues || isVeryNegative || result.data.confidenceScore < 0.5;
 
     return {
       success: true,
-      data: parsed,
-      confidenceScore: parsed.confidenceScore,
+      data: result.data,
+      confidenceScore: result.data.confidenceScore,
       shouldEscalate,
       escalationReason: shouldEscalate
-        ? `Critical sentiment issues detected or severely negative perception (score: ${parsed.overallSentiment.score})`
+        ? `Critical sentiment issues detected or severely negative perception (score: ${result.data.overallSentiment.score})`
         : undefined,
-      tokensUsed,
+      tokensUsed: result.tokensUsed,
     };
   }
 }

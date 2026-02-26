@@ -10,7 +10,7 @@ import {
 
 export class ReviewResponseAgent extends BaseAgent {
   constructor() {
-    super("REVIEW_RESPONSE", "claude-sonnet-4-20250514");
+    super("REVIEW_RESPONSE");
   }
 
   async execute(input: ReviewResponseInput): Promise<AgentResult<ReviewResponse>> {
@@ -63,42 +63,28 @@ INSTRUCTIONS:
 Respond with a JSON object matching this schema:
 ${JSON.stringify(ReviewResponseSchema.shape, null, 2)}`;
 
-    const response = await this.client.messages.create({
-      model: this.model,
-      max_tokens: 2000,
+    const result = await this.callLLM<ReviewResponse>({
       system: systemPrompt,
-      messages: [
-        {
-          role: "user",
-          content: `Write a response to this ${parsedInput.review.platform} review from ${parsedInput.review.author}.`,
-        },
-      ],
+      userMessage: `Write a response to this ${parsedInput.review.platform} review from ${parsedInput.review.author}.`,
+      schema: ReviewResponseSchema,
+      maxTokens: 2000,
     });
 
-    const textBlock = response.content.find((b) => b.type === "text");
-    if (!textBlock || textBlock.type !== "text") {
-      throw new Error("No text response from Claude");
+    if (!result.data) {
+      throw new Error("Failed to generate structured review response");
     }
 
-    const jsonMatch = textBlock.text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      throw new Error("No JSON found in response");
-    }
-
-    const parsed = ReviewResponseSchema.parse(JSON.parse(jsonMatch[0]));
-    const tokensUsed = (response.usage?.input_tokens || 0) + (response.usage?.output_tokens || 0);
-
-    const shouldEscalate = parsed.shouldEscalate.required || parsed.sentiment === "URGENT";
+    const shouldEscalate = result.data.shouldEscalate.required || result.data.sentiment === "URGENT";
 
     return {
       success: true,
-      data: parsed,
-      confidenceScore: parsed.confidenceScore,
+      data: result.data,
+      confidenceScore: result.data.confidenceScore,
       shouldEscalate,
       escalationReason: shouldEscalate
-        ? `Review requires escalation: ${parsed.shouldEscalate.reason}`
+        ? `Review requires escalation: ${result.data.shouldEscalate.reason}`
         : undefined,
-      tokensUsed,
+      tokensUsed: result.tokensUsed,
     };
   }
 }

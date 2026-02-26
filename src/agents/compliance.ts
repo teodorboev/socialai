@@ -1,19 +1,21 @@
-import { BaseAgent, type AgentResult, type OrgContext } from "./shared/base-agent";
+import { BaseAgent, type AgentResult } from "./shared/base-agent";
 import { z } from "zod";
 import { ComplianceResultSchema, type ComplianceInput } from "@/lib/ai/schemas/compliance";
+import { loadPrompt } from "@/lib/ai/prompts/loader";
 
 export class ComplianceAgent extends BaseAgent {
   constructor() {
     super("COMPLIANCE");
+    this.setTaskType("moderation");
   }
 
-  protected async getStaticSystemPrompt(orgContext: OrgContext): Promise<string> {
-    const input = orgContext as unknown as ComplianceInput;
-
+  async execute(input: ComplianceInput): Promise<AgentResult<z.infer<typeof ComplianceResultSchema>>> {
+    // Try to load prompt from DB first
+    let systemPrompt: string;
     try {
-      return await this.getPromptFromTemplate("main", {
+      systemPrompt = await loadPrompt("COMPLIANCE", "main", {
         brandName: input.brandConfig.brandName,
-        industry: input.brandConfig.industry,
+        industry: input.brandConfig.industry || "",
         doNots: JSON.stringify(input.brandConfig.doNots),
         regulatoryNotes: input.brandConfig.regulatoryNotes || "",
         platform: input.content.platform,
@@ -22,16 +24,10 @@ export class ComplianceAgent extends BaseAgent {
         hashtags: JSON.stringify(input.content.hashtags),
         altText: input.content.altText || "",
         linkUrl: input.content.linkUrl || "",
-      });
+      }, input.organizationId);
     } catch {
-      return `You are a compliance and brand safety expert. You review content for regulatory compliance, brand guidelines, platform ToS, and copyright issues. Always respond with valid JSON.`;
+      systemPrompt = `You are a compliance and brand safety expert. You review content for regulatory compliance, brand guidelines, platform ToS, and copyright issues. Always respond with valid JSON.`;
     }
-  }
-
-  async execute(input: ComplianceInput): Promise<AgentResult<z.infer<typeof ComplianceResultSchema>>> {
-    const orgContext: OrgContext = input as unknown as OrgContext;
-
-    const systemPrompt = await this.buildCachedPrompt(orgContext);
 
     const userPrompt = `Check the following content for compliance issues:
 
@@ -81,10 +77,11 @@ Respond with JSON:
   "confidenceScore": 0.0-1.0
 }`;
 
-    const { text, tokensUsed } = await this.callClaude({
+    const { text, tokensUsed, inputTokens, outputTokens } = await this.callLLM({
       system: systemPrompt,
       userMessage: userPrompt,
       maxTokens: 2000,
+      organizationId: input.organizationId,
     });
 
     if (!text) {
@@ -103,13 +100,16 @@ Respond with JSON:
       confidenceScore: validated.confidenceScore,
       shouldEscalate,
       escalationReason: shouldEscalate
-        ? `Compliance failures: ${validated.checks.filter((c) => c.status === "fail").map((c) => c.category).join(", ")}`
+        ? `Compliance issues detected: ${validated.checks.filter((c) => c.status === "fail").map((c) => c.category).join(", ")}`
         : undefined,
       tokensUsed,
+      inputTokens,
+      outputTokens,
     };
   }
 
   private parseJsonResponse(text: string): unknown {
+    // Try to find JSON in the response
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
       throw new Error("No JSON found in Claude response");

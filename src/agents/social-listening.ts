@@ -29,21 +29,22 @@ export class SocialListeningAgent extends BaseAgent {
 
   async execute(input: SocialListeningInput): Promise<AgentResult<z.infer<typeof ListeningReportSchema>>> {
     const orgContext: OrgContext = input as unknown as OrgContext;
-    const systemPrompt = await this.buildCachedPrompt(orgContext);
+    const cachedBlocks = await this.buildCachedPrompt(orgContext);
+    const systemPrompt = cachedBlocks.map(b => b.text).join("\n\n");
     const userPrompt = buildSocialListeningPrompt(input);
 
-    const { text, tokensUsed } = await this.callClaude({
+    const result = await this.callLLM<z.infer<typeof ListeningReportSchema>>({
       system: systemPrompt,
       userMessage: userPrompt,
+      schema: ListeningReportSchema,
       maxTokens: 4000,
     });
 
-    if (!text) {
-      throw new Error("No text response from Claude");
+    if (!result.data) {
+      throw new Error("No structured data returned from LLM");
     }
 
-    const parsed = this.parseJsonResponse(text);
-    const validated = ListeningReportSchema.parse(parsed);
+    const validated = result.data;
 
     // Escalate on critical alerts or crisis
     const criticalAlerts = validated.alerts.filter((a) => a.severity === "critical");
@@ -58,7 +59,7 @@ export class SocialListeningAgent extends BaseAgent {
       escalationReason: shouldEscalate
         ? `Critical alerts: ${criticalAlerts.map((a) => a.title).join(", ")}${hasCrisis ? "; Sentiment crisis detected" : ""}`
         : undefined,
-      tokensUsed,
+      tokensUsed: result.tokensUsed,
     };
   }
 

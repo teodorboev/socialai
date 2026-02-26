@@ -127,33 +127,25 @@ export class EngagementAgent extends BaseAgent {
 
     const userMessage = `Analyze and respond to this ${engagement.type.toLowerCase()}.`;
 
-    const { text, tokensUsed } = await this.callClaude({
+    const result = await this.callLLM<EngagementResponse>({
       system: systemPrompt,
       userMessage,
       maxTokens: 2000,
+      schema: EngagementResponseSchema,
     });
 
-    // Parse the JSON response
-    let parsed: EngagementResponse;
-    try {
-      if (!text) {
-        throw new Error("No text response from Claude");
-      }
-      const jsonMatch = text.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) {
-        throw new Error("No JSON found in response");
-      }
-      parsed = EngagementResponseSchema.parse(JSON.parse(jsonMatch[0]));
-    } catch (parseError) {
-      console.error("Failed to parse engagement response:", parseError, text);
+    if (!result.data) {
+      console.error("Failed to parse engagement response");
       return {
         success: false,
         confidenceScore: 0,
         shouldEscalate: true,
         escalationReason: "Failed to parse AI response",
-        tokensUsed,
+        tokensUsed: result.tokensUsed,
       };
     }
+
+    const parsed = result.data;
 
     // Check for forced escalation rules
     const forceEscalation = shouldForceEscalate(input, {
@@ -170,7 +162,7 @@ export class EngagementAgent extends BaseAgent {
       confidenceScore: parsed.confidenceScore,
       shouldEscalate,
       escalationReason: forceEscalation?.reason || (shouldEscalate ? `Low confidence (${parsed.confidenceScore}): ${parsed.reasoning}` : undefined),
-      tokensUsed,
+      tokensUsed: result.tokensUsed,
     };
   }
 }

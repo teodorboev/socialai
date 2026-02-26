@@ -2,6 +2,7 @@ import { BaseAgent, type OrgContext } from "./shared/base-agent";
 import type { AgentName, Platform } from "@prisma/client";
 import { AnalyticsReportSchema, type AnalyticsReport } from "@/lib/ai/schemas/analytics";
 import { buildAnalyticsPrompt } from "@/lib/ai/prompts/analytics";
+import { loadPrompt } from "@/lib/ai/prompts/loader";
 
 interface SnapshotInput {
   organizationId: string;
@@ -65,89 +66,38 @@ export async function collectMetrics(
 export class AnalyticsAgent extends BaseAgent {
   constructor() {
     super("ANALYTICS");
-  }
-
-  protected async getStaticSystemPrompt(orgContext: OrgContext): Promise<string> {
-    const { brandName, periodDays, snapshots, contentPerformance, previousRecommendations } = orgContext as unknown as {
-      brandName: string;
-      periodDays: number;
-      snapshots: Array<{
-        platform: string;
-        followers: number;
-        impressions: number;
-        reach: number;
-        engagementRate: number;
-        clicks: number;
-        shares: number;
-        saves: number;
-        snapshotDate: string;
-      }>;
-      contentPerformance: Array<{
-        contentId: string;
-        platform: string;
-        contentType: string;
-        caption: string;
-        impressions: number;
-        engagement: number;
-        engagementRate: number;
-        clicks: number;
-        shares: number;
-        saves: number;
-        publishedAt: string;
-      }>;
-      previousRecommendations?: string[];
-    };
-
-    try {
-      return await this.getPromptFromTemplate("main", {
-        brandName,
-        periodDays,
-        snapshots: JSON.stringify(snapshots),
-        contentPerformance: JSON.stringify(contentPerformance),
-        previousRecommendations: previousRecommendations ? JSON.stringify(previousRecommendations) : "",
-      });
-    } catch {
-      return buildAnalyticsPrompt({
-        brandName,
-        periodDays,
-        snapshots,
-        contentPerformance,
-        previousRecommendations,
-      });
-    }
+    this.setTaskType("analysis");
   }
 
   async execute(input: ReportInput) {
-    const { brandName, periodDays, snapshots, contentPerformance, previousRecommendations } = input;
+    const { brandName, periodDays, snapshots, contentPerformance, previousRecommendations, organizationId } = input;
 
-    const orgContext: OrgContext = {
-      organizationId: input.organizationId,
-      brandName,
-      periodDays,
-      snapshots: snapshots.map((s) => ({
-        platform: s.platform,
-        followers: s.followers,
-        impressions: s.impressions,
-        reach: s.reach,
-        engagementRate: s.engagementRate,
-        clicks: s.clicks,
-        shares: s.shares,
-        saves: s.saves,
-        snapshotDate: s.snapshotDate.toISOString(),
-      })),
-      contentPerformance: contentPerformance.map((c) => ({
-        ...c,
-        publishedAt: c.publishedAt.toISOString(),
-      })),
-      previousRecommendations,
-    };
+    // Load prompt from DB
+    let systemPrompt: string;
+    try {
+      systemPrompt = await loadPrompt("ANALYTICS", "main", {
+        brandName,
+        periodDays: String(periodDays),
+        snapshots: JSON.stringify(snapshots),
+        contentPerformance: JSON.stringify(contentPerformance),
+        previousRecommendations: previousRecommendations ? JSON.stringify(previousRecommendations) : "",
+      }, organizationId);
+    } catch {
+      // Fallback to hardcoded prompt if DB fails
+      systemPrompt = buildAnalyticsPrompt({
+        brandName,
+        periodDays,
+        snapshots: snapshots.map(s => ({ ...s, snapshotDate: s.snapshotDate.toString() })),
+        contentPerformance: contentPerformance.map(c => ({ ...c, publishedAt: c.publishedAt.toString() })),
+        previousRecommendations,
+      });
+    }
 
-    const systemPrompt = await this.buildCachedPrompt(orgContext);
-
-    const { text, tokensUsed } = await this.callClaude({
+    const { text, tokensUsed, inputTokens, outputTokens } = await this.callLLM({
       system: systemPrompt,
       userMessage: "Generate the analytics report for this period.",
       maxTokens: 4000,
+      organizationId,
     });
 
     // Parse the JSON response
@@ -169,6 +119,8 @@ export class AnalyticsAgent extends BaseAgent {
         shouldEscalate: true,
         escalationReason: "Failed to parse AI response",
         tokensUsed,
+        inputTokens,
+        outputTokens,
       };
     }
 
@@ -178,6 +130,8 @@ export class AnalyticsAgent extends BaseAgent {
       confidenceScore: parsed.confidenceScore,
       shouldEscalate: parsed.confidenceScore < 0.6,
       tokensUsed,
+      inputTokens,
+      outputTokens,
     };
   }
 }

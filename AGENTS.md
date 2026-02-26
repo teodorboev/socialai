@@ -22,7 +22,8 @@ Skills contain agent-specific architecture, schemas, prompts, and checklists. Re
 | Content review / approval UI | `ai-first-ux` → `predictive-content` |
 | Notification system | `ai-first-ux` |
 | Crisis mode UI | `ai-first-ux` → `crisis-response` |
-| Any new AI agent | `base-agent` → `[specific agent]` |
+| Any LLM call from any agent | **`smart-router` — ALL LLM calls route through this. Read before modifying BaseAgent.** |
+| Billing / subscriptions | `billing` → `smart-router` (entitlements gate agents) |
 | Content generation pipeline | `base-agent` → `content-creator` → `hashtag-optimizer` → `visual` → `compliance` → `publisher` |
 | Comment/DM auto-responses | `base-agent` → `engagement` |
 | Monthly content planning | `base-agent` → `strategy` → `analytics` → `audience-intelligence` |

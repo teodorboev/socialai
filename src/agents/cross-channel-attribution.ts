@@ -2,16 +2,29 @@ import { BaseAgent, AgentResult } from "./shared/base-agent";
 import { AgentName } from "@prisma/client";
 import { z } from "zod";
 import { CrossChannelAttributionSchema, CrossChannelAttributionInputSchema, type CrossChannelAttributionInput, type CrossChannelAttribution } from "@/lib/ai/schemas/cross-channel-attribution";
+import { loadPrompt } from "@/lib/ai/prompts/loader";
 
 export class CrossChannelAttributionAgent extends BaseAgent {
   constructor() {
-    super("CROSS_CHANNEL_ATTRIBUTION", "claude-sonnet-4-20250514");
+    super("CROSS_CHANNEL_ATTRIBUTION");
+    this.setTaskType("analysis");
   }
 
   async execute(input: CrossChannelAttributionInput): Promise<AgentResult<CrossChannelAttribution>> {
     const parsedInput = CrossChannelAttributionInputSchema.parse(input);
 
-    const systemPrompt = `You are a Cross-Channel Attribution Expert specializing in tracking customer journeys across multiple touchpoints.
+    // Try to load prompt from DB first
+    let systemPrompt: string;
+    try {
+      systemPrompt = await loadPrompt("CROSS_CHANNEL_ATTRIBUTION", "main", {
+        brandName: parsedInput.brandName,
+        channels: parsedInput.channels.join(", "),
+        dateRange: `${parsedInput.dateRange.start} to ${parsedInput.dateRange.end}`,
+        customerData: parsedInput.customerData ? JSON.stringify(parsedInput.customerData.slice(0, 20)) : "",
+      }, parsedInput.organizationId);
+    } catch {
+      // Fallback to inline prompt
+      systemPrompt = `You are a Cross-Channel Attribution Expert specializing in tracking customer journeys across multiple touchpoints.
 
 Your role is to analyze how different channels contribute to conversions and optimize the marketing mix.
 
@@ -38,28 +51,28 @@ ANALYSIS FRAMEWORK:
 
 Respond with a JSON object matching this schema:
 ${JSON.stringify(CrossChannelAttributionSchema.shape, null, 2)}`;
+    }
 
-    const response = await this.client.messages.create({
-      model: this.model,
-      max_tokens: 3000,
+    const { data, tokensUsed, inputTokens, outputTokens } = await this.callLLM<CrossChannelAttribution>({
       system: systemPrompt,
-      messages: [{ role: "user", content: `Analyze cross-channel attribution for ${parsedInput.brandName}.` }],
+      userMessage: `Analyze cross-channel attribution for ${parsedInput.brandName}.`,
+      maxTokens: 3000,
+      organizationId: parsedInput.organizationId,
+      schema: CrossChannelAttributionSchema,
     });
 
-    const textBlock = response.content.find((b) => b.type === "text");
-    if (!textBlock || textBlock.type !== "text") throw new Error("No text response");
-    const jsonMatch = textBlock.text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) throw new Error("No JSON found");
-
-    const parsed = CrossChannelAttributionSchema.parse(JSON.parse(jsonMatch[0]));
-    const tokensUsed = (response.usage?.input_tokens || 0) + (response.usage?.output_tokens || 0);
+    if (!data) {
+      throw new Error("Failed to parse cross-channel attribution response");
+    }
 
     return {
       success: true,
-      data: parsed,
-      confidenceScore: parsed.confidenceScore,
-      shouldEscalate: parsed.confidenceScore < 0.5,
+      data,
+      confidenceScore: data.confidenceScore,
+      shouldEscalate: data.confidenceScore < 0.5,
       tokensUsed,
+      inputTokens,
+      outputTokens,
     };
   }
 }
