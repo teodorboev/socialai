@@ -158,12 +158,12 @@ Respond with a JSON object matching this schema exactly.',
 WHERE NOT EXISTS (SELECT 1 FROM "prompt_templates" WHERE "agentName" = 'CONTENT_CREATOR' AND "name" = 'main');
 
 -- ============================================================
--- VISUAL
+-- CREATIVE_DIRECTOR (formerly VISUAL)
 -- ============================================================
 INSERT INTO "prompt_templates" ("id", "agentName", "name", "description", "body", "variables", "version", "is_active", "created_at", "updated_at")
 SELECT 
   gen_random_uuid(),
-  'VISUAL',
+  'CREATIVE_DIRECTOR',
   'main',
   'Main visual generation prompt',
   'You are an expert visual content creator for {{brandName}}.
@@ -201,7 +201,7 @@ INSTRUCTIONS:
 Respond with a JSON object matching the required schema.',
   ARRAY['brandName', 'visualStyle', 'brandColors', 'typography', 'platform', 'contentType', 'dimensions', 'aspectRatio', 'caption', 'mood', 'references'],
   1, true, now(), now()
-WHERE NOT EXISTS (SELECT 1 FROM "prompt_templates" WHERE "agentName" = 'VISUAL' AND "name" = 'main');
+WHERE NOT EXISTS (SELECT 1 FROM "prompt_templates" WHERE "agentName" = 'CREATIVE_DIRECTOR' AND "name" = 'main');
 
 -- ============================================================
 -- PUBLISHER
