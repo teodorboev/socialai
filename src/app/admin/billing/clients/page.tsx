@@ -25,14 +25,16 @@ async function getBillingStats() {
     prisma.subscription.count({ where: { status: "canceled" } }),
   ]);
 
-  // Get MRR
+  // Get MRR - use select instead of include to avoid Prisma issues
   const activeSubs = await prisma.subscription.findMany({
     where: { status: "active" },
-    include: {
+    select: {
       billingPlan: {
-        include: {
+        select: {
+          name: true,
           stripePrices: {
             where: { interval: "month", isActive: true },
+            select: { unitAmount: true },
           },
         },
       },
@@ -41,7 +43,7 @@ async function getBillingStats() {
 
   let mrr = 0;
   for (const sub of activeSubs) {
-    const price = sub.billingPlan.stripePrices[0]?.unitAmount ?? 0;
+    const price = sub.billingPlan?.stripePrices[0]?.unitAmount ?? 0;
     mrr += price;
   }
 
@@ -56,23 +58,46 @@ async function getBillingStats() {
 }
 
 async function getClientSubscriptions() {
-  return prisma.subscription.findMany({
-    include: {
+  // Get subscriptions with minimal data first
+  const subs = await prisma.subscription.findMany({
+    select: {
+      id: true,
+      status: true,
+      currency: true,
+      interval: true,
+      createdAt: true,
+      currentPeriodEnd: true,
+      organizationId: true,
       organization: {
         select: { name: true, slug: true },
       },
-      billingPlan: {
-        select: { name: true, slug: true },
-        include: {
-          stripePrices: {
-            where: { interval: "month", isActive: true },
-            take: 1,
-          },
-        },
-      },
+      billingPlanId: true,
     },
     orderBy: { createdAt: "desc" },
   });
+
+  // Get all billing plans with their prices in one query
+  const planIds = [...new Set(subs.map(s => s.billingPlanId))];
+  const plans = await prisma.billingPlan.findMany({
+    where: { id: { in: planIds } },
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      stripePrices: {
+        where: { interval: "month", isActive: true },
+        select: { unitAmount: true, currency: true },
+      },
+    },
+  });
+
+  const planMap = new Map(plans.map(p => [p.id, p]));
+
+  // Merge the data
+  return subs.map(sub => ({
+    ...sub,
+    billingPlan: planMap.get(sub.billingPlanId),
+  }));
 }
 
 async function getMonthlyCosts(orgId: string) {
@@ -150,7 +175,7 @@ export default async function BillingClientsPage() {
           </thead>
           <tbody>
             {subscriptionsWithCosts.map((sub) => {
-              const mrr = sub.billingPlan.stripePrices?.[0]?.unitAmount ?? 0;
+              const mrr = sub.billingPlan?.stripePrices?.[0]?.unitAmount ?? 0;
               const margin = mrr - (sub.monthlyCost * 100);
               const marginPercent = mrr > 0 ? (margin / mrr) * 100 : 0;
 
@@ -162,7 +187,7 @@ export default async function BillingClientsPage() {
                       {sub.organization.slug}
                     </div>
                   </td>
-                  <td className="p-3">{sub.billingPlan.name}</td>
+                  <td className="p-3">{sub.billingPlan?.name ?? "Unknown"}</td>
                   <td className="p-3">
                     <span
                       className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${

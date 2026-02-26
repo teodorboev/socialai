@@ -7,10 +7,9 @@
 
 import { prisma } from "@/lib/prisma";
 import { formatPrice, getSupportedCurrencies, getYearlyDiscountPercent } from "@/lib/billing/currency";
-import { syncPlanToStripe, syncPriceToStripe } from "@/lib/billing/stripe";
-import { revalidatePath } from "next/cache";
+import { Suspense } from "react";
 
-// Force dynamic rendering
+// Force dynamic rendering to avoid static prerendering issues
 export const dynamic = "force-dynamic";
 
 interface PageProps {
@@ -32,13 +31,17 @@ async function getPlans() {
 }
 
 async function getMRRByPlan() {
+  // Get active subscriptions with their billing plan
   const subscriptions = await prisma.subscription.findMany({
     where: { status: "active" },
-    include: {
+    select: {
+      billingPlanId: true,
       billingPlan: {
-        include: {
+        select: {
+          name: true,
           stripePrices: {
             where: { interval: "month", isActive: true },
+            select: { unitAmount: true },
           },
         },
       },
@@ -56,39 +59,44 @@ async function getMRRByPlan() {
   return mrrByPlan;
 }
 
-export default async function BillingPlansPage({ searchParams }: PageProps) {
-  const params = await searchParams;
-  const plans = await getPlans();
-  const mrrByPlan = await getMRRByPlan();
-
+function PlansList() {
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold">Plan Management</h1>
-          <p className="text-muted-foreground">
-            Manage billing plans and pricing (synced with Stripe)
-          </p>
-        </div>
-        <a
-          href="/admin/billing/plans/new"
-          className="inline-flex items-center justify-center rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2"
-        >
-          + New Plan
-        </a>
+    <div className="space-y-4">
+      <div className="text-center py-12 text-muted-foreground">
+        Loading plans...
       </div>
+    </div>
+  );
+}
 
-      {params.success && (
+function AlertMessages({ success, error }: { success?: string; error?: string }) {
+  if (!success && !error) return null;
+  
+  return (
+    <>
+      {success && (
         <div className="p-4 bg-green-50 border border-green-200 rounded-md text-green-800">
           Plan saved and synced to Stripe successfully!
         </div>
       )}
 
-      {params.error && (
+      {error && (
         <div className="p-4 bg-red-50 border border-red-200 rounded-md text-red-800">
-          Error: {params.error}
+          Error: {error}
         </div>
       )}
+    </>
+  );
+}
+
+async function PlansContent({ params }: { params: PageProps['searchParams'] }) {
+  const searchParams = await params;
+  const plans = await getPlans();
+  const mrrByPlan = await getMRRByPlan();
+
+  return (
+    <>
+      <AlertMessages success={searchParams.success} error={searchParams.error} />
 
       <div className="space-y-4">
         {plans.map((plan) => (
@@ -197,6 +205,31 @@ export default async function BillingPlansPage({ searchParams }: PageProps) {
           No plans configured. Create your first plan to get started.
         </div>
       )}
+    </>
+  );
+}
+
+export default async function BillingPlansPage({ searchParams }: PageProps) {
+  return (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-bold">Plan Management</h1>
+          <p className="text-muted-foreground">
+            Manage billing plans and pricing (synced with Stripe)
+          </p>
+        </div>
+        <a
+          href="/admin/billing/plans/new"
+          className="inline-flex items-center justify-center rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2"
+        >
+          + New Plan
+        </a>
+      </div>
+
+      <Suspense fallback={<PlansList />}>
+        <PlansContent params={searchParams} />
+      </Suspense>
     </div>
   );
 }

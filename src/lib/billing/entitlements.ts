@@ -38,6 +38,7 @@ export const AGENT_TIERS: Record<string, string[]> = {
     "CAPTION_REWRITER",
     "BRAND_VOICE_GUARDIAN",
     "REPORTING_NARRATOR",
+    "AB_TESTING",
   ],
   
   // Full agents - all capabilities including premium

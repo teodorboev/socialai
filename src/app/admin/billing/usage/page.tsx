@@ -27,17 +27,27 @@ interface UsageData {
 export default function UsagePage() {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<UsageData | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [period, setPeriod] = useState("month");
 
   useEffect(() => {
     async function fetchUsage() {
       setLoading(true);
+      setError(null);
       try {
         const response = await fetch(`/api/admin/billing/usage?period=${period}`);
         const json = await response.json();
-        setData(json);
-      } catch (error) {
-        console.error("Failed to fetch usage:", error);
+        
+        if (!response.ok || json.error) {
+          setError(json.error || "Failed to fetch usage data");
+          setData(null);
+        } else {
+          setData(json);
+        }
+      } catch (err) {
+        console.error("Failed to fetch usage:", err);
+        setError("Failed to fetch usage data");
+        setData(null);
       } finally {
         setLoading(false);
       }
@@ -45,10 +55,66 @@ export default function UsagePage() {
     fetchUsage();
   }, [period]);
 
+  // Show error state
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">AI Usage & Costs</h1>
+            <p className="text-muted-foreground">
+              Monitor AI agent usage and costs across all organizations
+            </p>
+          </div>
+          <select
+            value={period}
+            onChange={(e) => setPeriod(e.target.value)}
+            className="h-10 rounded-md border border-input bg-background px-3 py-2"
+          >
+            <option value="month">This Month</option>
+            <option value="year">This Year</option>
+            <option value="all">All Time</option>
+          </select>
+        </div>
+        <div className="p-4 bg-red-50 border border-red-200 rounded-md text-red-800">
+          Error: {error}
+        </div>
+      </div>
+    );
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
         <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
+  }
+
+  // Guard against missing data
+  if (!data || !data.summary) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">AI Usage & Costs</h1>
+            <p className="text-muted-foreground">
+              Monitor AI agent usage and costs across all organizations
+            </p>
+          </div>
+          <select
+            value={period}
+            onChange={(e) => setPeriod(e.target.value)}
+            className="h-10 rounded-md border border-input bg-background px-3 py-2"
+          >
+            <option value="month">This Month</option>
+            <option value="year">This Year</option>
+            <option value="all">All Time</option>
+          </select>
+        </div>
+        <div className="text-center py-12 text-muted-foreground">
+          No usage data available
+        </div>
       </div>
     );
   }
