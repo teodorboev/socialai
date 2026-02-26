@@ -11,7 +11,12 @@
     "db:seed": "npx tsx prisma/seed.ts",
     "test": "vitest",
     "test:run": "vitest run",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "db:optimize": "npx tsx scripts/db-optimize.ts",
+    "analyze:agents": "npx tsx scripts/analyze-agents.ts",
+    "analyze:content": "npx tsx scripts/analyze-content.ts",
+    "optimize:prompts": "npx tsx scripts/optimize-prompts.ts",
+    "health:check": "npx tsx scripts/health-check.ts"
   },
   "prisma": {
     "seed": "npx tsx prisma/seed.ts"
