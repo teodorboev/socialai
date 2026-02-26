@@ -9,9 +9,30 @@
  * Usage: npx tsx scripts/db-optimize.ts
  */
 
+import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
+import { PrismaPg } from "@prisma/adapter-pg";
+import pg from "pg";
 
-const prisma = new PrismaClient();
+const { Pool } = pg;
+
+function createPrismaClient() {
+  const connectionString = process.env.DATABASE_URL || process.env.DIRECT_URL;
+  
+  if (!connectionString) {
+    throw new Error("DATABASE_URL or DIRECT_URL not set");
+  }
+
+  const pool = new Pool({ connectionString });
+  const adapter = new PrismaPg(pool);
+  
+  return new PrismaClient({
+    adapter,
+    log: ["error"],
+  });
+}
+
+const prisma = createPrismaClient();
 
 async function main() {
   console.log("🗄️  Starting database optimization...\n");
@@ -20,8 +41,8 @@ async function main() {
   console.log("📊 Analyzing tables...");
   const tables = [
     "content",
-    "engagement", 
-    "schedule",
+    "engagements", 
+    "schedules",
     "agent_logs",
     "escalations",
     "analytics_snapshots",
