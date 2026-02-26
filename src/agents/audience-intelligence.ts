@@ -1,5 +1,4 @@
-import { BaseAgent } from "./shared/base-agent";
-import type { AgentResult } from "./shared/base-agent";
+import { BaseAgent, type AgentResult, type OrgContext } from "./shared/base-agent";
 import { z } from "zod";
 import { AudienceReportSchema, type AudienceIntelInput } from "@/lib/ai/schemas/audience-intelligence";
 import { buildAudienceIntelPrompt } from "@/lib/ai/prompts/audience-intelligence";
@@ -9,9 +8,26 @@ export class AudienceIntelligenceAgent extends BaseAgent {
     super("AUDIENCE_INTELLIGENCE");
   }
 
-  async execute(input: AudienceIntelInput): Promise<AgentResult<z.infer<typeof AudienceReportSchema>>> {
-    const systemPrompt = `You are an audience intelligence expert. You analyze follower data and create detailed personas. Always respond with valid JSON matching the required schema.`;
+  protected async getStaticSystemPrompt(orgContext: OrgContext): Promise<string> {
+    const input = orgContext as unknown as AudienceIntelInput;
 
+    try {
+      return await this.getPromptFromTemplate("main", {
+        organizationId: input.organizationId,
+        brandName: input.brandConfig.brandName,
+        industry: input.brandConfig.industry,
+        platformData: JSON.stringify(input.platformData),
+        contentPerformance: JSON.stringify(input.contentPerformance),
+        previousReport: input.previousReport ? JSON.stringify(input.previousReport) : "",
+      });
+    } catch {
+      return `You are an audience intelligence expert. You analyze follower data and create detailed personas. Always respond with valid JSON matching the required schema.`;
+    }
+  }
+
+  async execute(input: AudienceIntelInput): Promise<AgentResult<z.infer<typeof AudienceReportSchema>>> {
+    const orgContext: OrgContext = input as unknown as OrgContext;
+    const systemPrompt = await this.buildCachedPrompt(orgContext);
     const userPrompt = buildAudienceIntelPrompt(input);
 
     const { text, tokensUsed } = await this.callClaude({

@@ -1,4 +1,4 @@
-import { BaseAgent } from "./shared/base-agent";
+import { BaseAgent, type OrgContext } from "./shared/base-agent";
 import type { AgentName, Plan } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { StrategyPlanSchema, type StrategyPlan } from "@/lib/ai/schemas/strategy";
@@ -50,17 +50,51 @@ export class StrategyAgent extends BaseAgent {
     super("STRATEGY");
   }
 
+  protected async getStaticSystemPrompt(orgContext: OrgContext): Promise<string> {
+    const input = orgContext as unknown as StrategyInput;
+
+    try {
+      return await this.getPromptFromTemplate("main", {
+        brandName: input.brandConfig.brandName,
+        industry: input.brandConfig.industry,
+        targetAudience: JSON.stringify(input.brandConfig.targetAudience),
+        voiceTone: JSON.stringify(input.brandConfig.voiceTone),
+        contentThemes: JSON.stringify(input.brandConfig.contentThemes),
+        competitors: JSON.stringify(input.brandConfig.competitors || []),
+        brandColors: JSON.stringify(input.brandConfig.brandColors),
+        doNots: JSON.stringify(input.brandConfig.doNots),
+        analyticsReport: input.analyticsReport ? JSON.stringify(input.analyticsReport) : "",
+        previousPlan: input.previousPlan ? JSON.stringify(input.previousPlan) : "",
+        trendContext: input.trendContext || "",
+        connectedPlatforms: JSON.stringify(input.connectedPlatforms),
+        planPeriod: JSON.stringify(input.planPeriod),
+        clientGoals: JSON.stringify(input.clientGoals || []),
+      });
+    } catch {
+      // Fallback to hardcoded
+      try {
+        return buildStrategyPrompt(input);
+      } catch {
+        return "You are an expert social media strategist.";
+      }
+    }
+  }
+
   async execute(input: StrategyInput) {
     const { organizationId, brandConfig, analyticsReport, previousPlan, trendContext, connectedPlatforms, planPeriod, clientGoals } = input;
 
-    const systemPrompt = buildStrategyPrompt({
-      ...input,
-      brandConfig: {
-        ...brandConfig,
-        voiceTone: brandConfig.voiceTone as any,
-        targetAudience: brandConfig.targetAudience as any,
-      },
-    });
+    const orgContext: OrgContext = {
+      organizationId,
+      brandConfig,
+      analyticsReport,
+      previousPlan,
+      trendContext,
+      connectedPlatforms,
+      planPeriod,
+      clientGoals,
+    };
+
+    const systemPrompt = await this.buildCachedPrompt(orgContext);
 
     const { text, tokensUsed } = await this.callClaude({
       system: systemPrompt,

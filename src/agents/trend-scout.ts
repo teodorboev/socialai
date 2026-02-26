@@ -1,4 +1,4 @@
-import { BaseAgent } from "./shared/base-agent";
+import { BaseAgent, type OrgContext } from "./shared/base-agent";
 import type { AgentName } from "@prisma/client";
 import { TrendReportSchema, type TrendReport } from "@/lib/ai/schemas/trends";
 
@@ -18,14 +18,23 @@ export class TrendScoutAgent extends BaseAgent {
     super("TREND_SCOUT");
   }
 
-  async execute(input: TrendScoutInput) {
-    const { brandConfig, connectedPlatforms } = input;
+  protected async getStaticSystemPrompt(orgContext: OrgContext): Promise<string> {
+    const input = orgContext as unknown as TrendScoutInput;
 
-    const systemPrompt = `You are a trend analyst for ${brandConfig.brandName} in the ${brandConfig.industry} industry.
+    try {
+      return await this.getPromptFromTemplate("main", {
+        brandName: input.brandConfig.brandName,
+        industry: input.brandConfig.industry,
+        contentThemes: JSON.stringify(input.brandConfig.contentThemes),
+        competitors: JSON.stringify(input.brandConfig.competitors || []),
+        connectedPlatforms: JSON.stringify(input.connectedPlatforms),
+      });
+    } catch {
+      return `You are a trend analyst for ${input.brandConfig.brandName} in the ${input.brandConfig.industry} industry.
 
 Your job is to identify trending topics, viral moments, and content opportunities that are relevant to this brand. Consider:
 
-1. Current social media trends on: ${connectedPlatforms.join(", ")}
+1. Current social media trends on: ${input.connectedPlatforms.join(", ")}
 2. Industry-specific news and developments
 3. Seasonal events and holidays
 4. Relevant hashtags and memes
@@ -42,6 +51,19 @@ For each trend identified, assess:
 Be specific and actionable. Focus on trends that would genuinely fit the brand, not just what's popular.
 
 Respond with a single JSON object. No markdown, no backticks.`;
+    }
+  }
+
+  async execute(input: TrendScoutInput) {
+    const { brandConfig, connectedPlatforms } = input;
+
+    const orgContext: OrgContext = {
+      organizationId: input.organizationId,
+      brandConfig,
+      connectedPlatforms,
+    };
+
+    const systemPrompt = await this.buildCachedPrompt(orgContext);
 
     const { text, tokensUsed } = await this.callClaude({
       system: systemPrompt,

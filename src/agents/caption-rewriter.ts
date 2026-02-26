@@ -1,4 +1,4 @@
-import { BaseAgent, AgentResult } from "./shared/base-agent";
+import { BaseAgent, AgentResult, type OrgContext } from "./shared/base-agent";
 import { AgentName } from "@prisma/client";
 import { z } from "zod";
 import {
@@ -13,48 +13,33 @@ export class CaptionRewriterAgent extends BaseAgent {
     super("CAPTION_REWRITER", "claude-sonnet-4-20250514");
   }
 
+  protected async getStaticSystemPrompt(orgContext: OrgContext): Promise<string> {
+    const input = orgContext as unknown as CaptionRewriterInput;
+    const parsedInput = CaptionRewriterInputSchema.parse(input);
+
+    try {
+      return await this.getPromptFromTemplate("main", {
+        organizationId: parsedInput.organizationId,
+        platform: parsedInput.platform,
+        contentType: parsedInput.contentType,
+        originalCaption: parsedInput.originalCaption,
+        issues: JSON.stringify(parsedInput.issues),
+        targetMetrics: JSON.stringify(parsedInput.targetMetrics),
+        brandVoice: parsedInput.brandVoice ? JSON.stringify(parsedInput.brandVoice) : "",
+        topPerformers: parsedInput.previousTopPerformers ? JSON.stringify(parsedInput.previousTopPerformers) : "",
+      });
+    } catch {
+      return `You are an expert social media copywriter specializing in content optimization.
+
+Your role is to analyze underperforming content and rewrite it to improve engagement metrics.`;
+    }
+  }
+
   async execute(input: CaptionRewriterInput): Promise<AgentResult<CaptionRewriter>> {
     const parsedInput = CaptionRewriterInputSchema.parse(input);
 
-    const systemPrompt = `You are an expert social media copywriter specializing in content optimization.
-
-Your role is to analyze underperforming content and rewrite it to improve engagement metrics.
-
-CONTEXT:
-- Original content did not meet performance expectations
-- You need to identify issues and create improved copy
-- Maintain brand voice while optimizing for better results
-- Platform: ${parsedInput.platform}
-- Content Type: ${parsedInput.contentType}
-
-INPUT DATA:
-${JSON.stringify(parsedInput, null, 2)}
-
-ISSUES TO ADDRESS:
-${parsedInput.issues.map((issue) => `- ${issue}`).join("\n")}
-
-TARGET METRICS:
-- Primary Goal: ${parsedInput.targetMetrics.primaryGoal}
-- Current: ${JSON.stringify(parsedInput.targetMetrics.currentMetrics || "N/A", null, 2)}
-
-${parsedInput.brandVoice ? `BRAND VOICE:
-- Tone: ${parsedInput.brandVoice.tone.join(", ")}
-- Do Nots: ${parsedInput.brandVoice.doNots?.join(", ") || "None"}
-` : ""}
-
-${parsedInput.previousTopPerformers?.length ? `TOP PERFORMERS TO REFERENCE:
-${parsedInput.previousTopPerformers.map((p) => `- ${p.caption} (metrics: ${JSON.stringify(p.metrics)})`).join("\n")}
-` : ""}
-
-INSTRUCTIONS:
-1. Analyze the original caption and identify what caused poor performance
-2. Rewrite the caption addressing all identified issues
-3. Make changes that align with brand voice
-4. Ensure the rewrite targets the specified metrics
-5. Provide confidence score (0-1) based on how well the rewrite addresses issues
-
-Respond with a JSON object matching this schema:
-${JSON.stringify(CaptionRewriterSchema.shape, null, 2)}`;
+    const orgContext: OrgContext = input as unknown as OrgContext;
+    const systemPrompt = await this.buildCachedPrompt(orgContext);
 
     const response = await this.client.messages.create({
       model: this.model,

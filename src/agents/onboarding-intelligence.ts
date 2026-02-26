@@ -1,4 +1,4 @@
-import { BaseAgent, AgentResult } from "./shared/base-agent";
+import { BaseAgent, AgentResult, type OrgContext } from "./shared/base-agent";
 import { AgentName } from "@prisma/client";
 import { z } from "zod";
 import {
@@ -13,62 +13,33 @@ export class OnboardingIntelligenceAgent extends BaseAgent {
     super("ONBOARDING_INTELLIGENCE", "claude-sonnet-4-20250514");
   }
 
+  protected async getStaticSystemPrompt(orgContext: OrgContext): Promise<string> {
+    const input = orgContext as unknown as OnboardingIntelligenceInput;
+    const parsedInput = OnboardingIntelligenceInputSchema.parse(input);
+
+    try {
+      return await this.getPromptFromTemplate("main", {
+        companyName: parsedInput.clientInfo.companyName,
+        industry: parsedInput.clientInfo.industry,
+        companySize: parsedInput.clientInfo.companySize,
+        website: parsedInput.clientInfo.website || "",
+        goals: JSON.stringify(parsedInput.goals),
+        budget: parsedInput.budget ? JSON.stringify(parsedInput.budget) : "",
+        painPoints: parsedInput.currentPainPoints ? JSON.stringify(parsedInput.currentPainPoints) : "",
+        teamInfo: parsedInput.teamInfo ? JSON.stringify(parsedInput.teamInfo) : "",
+      });
+    } catch {
+      return `You are a Client Onboarding Expert specializing in creating personalized onboarding experiences for new social media management clients.
+
+Your role is to design an onboarding plan that sets new clients up for success based on their specific needs, goals, and resources.`;
+    }
+  }
+
   async execute(input: OnboardingIntelligenceInput): Promise<AgentResult<OnboardingIntelligence>> {
     const parsedInput = OnboardingIntelligenceInputSchema.parse(input);
 
-    const systemPrompt = `You are a Client Onboarding Expert specializing in creating personalized onboarding experiences for new social media management clients.
-
-Your role is to design an onboarding plan that sets new clients up for success based on their specific needs, goals, and resources.
-
-CONTEXT:
-- New client onboarding for ${parsedInput.clientInfo.companyName}
-- Industry: ${parsedInput.clientInfo.industry}
-- Company Size: ${parsedInput.clientInfo.companySize}
-
-INPUT DATA:
-${JSON.stringify(parsedInput, null, 2)}
-
-CLIENT INFO:
-- Company: ${parsedInput.clientInfo.companyName}
-- Industry: ${parsedInput.clientInfo.industry}
-- Size: ${parsedInput.clientInfo.companySize}
-${parsedInput.clientInfo.website ? `- Website: ${parsedInput.clientInfo.website}` : ""}
-
-${parsedInput.clientInfo.existingSocialAccounts?.length ? `EXISTING SOCIAL ACCOUNTS:
-${parsedInput.clientInfo.existingSocialAccounts.map((a) => `- ${a.platform}: ${a.handle} (${a.followers} followers)`).join("\n")}
-` : ""}
-
-GOALS (${parsedInput.goals.length}):
-${parsedInput.goals.map((g) => `- ${g.goal} (Priority: ${g.priority})`).join("\n")}
-
-${parsedInput.budget ? `BUDGET:
-- Monthly: ${parsedInput.budget.monthly ? `$${parsedInput.budget.monthly}` : "Not specified"}
-- Has separate ad spend: ${parsedInput.budget.hasAdSpend ? "Yes" : "No"}
-` : ""}
-
-${parsedInput.currentPainPoints?.length ? `PAIN POINTS:
-${parsedInput.currentPainPoints.map((p) => `- ${p}`).join("\n")}
-` : ""}
-
-${parsedInput.teamInfo ? `TEAM INFO:
-- Has social manager: ${parsedInput.teamInfo.hasSocialManager ? "Yes" : "No"}
-- Has content creator: ${parsedInput.teamInfo.hasContentCreator ? "Yes" : "No"}
-- Has designer: ${parsedInput.teamInfo.hasDesigner ? "Yes" : "No"}
-- Preferred involvement: ${parsedInput.teamInfo.preferredInvolvement || "Not specified"}
-` : ""}
-
-INSTRUCTIONS:
-1. Design ordered onboarding steps that make sense for this client
-2. Identify required brand voice setup questions
-3. Recommend a subscription tier based on goals and budget
-4. Prioritize platforms based on industry and goals
-5. Suggest initial content strategy and campaigns
-6. Create a realistic timeline with milestones
-7. Recommend required/recommended integrations
-8. Provide confidence score based on information available
-
-Respond with a JSON object matching this schema:
-${JSON.stringify(OnboardingIntelligenceSchema.shape, null, 2)}`;
+    const orgContext: OrgContext = input as unknown as OrgContext;
+    const systemPrompt = await this.buildCachedPrompt(orgContext);
 
     const response = await this.client.messages.create({
       model: this.model,

@@ -1,4 +1,4 @@
-import { BaseAgent } from "./shared/base-agent";
+import { BaseAgent, type OrgContext } from "./shared/base-agent";
 import type { AgentName, Platform, EngagementType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { EngagementResponseSchema, type EngagementResponse } from "@/lib/ai/schemas/engagement";
@@ -44,6 +44,43 @@ export interface EngagementInput {
 export class EngagementAgent extends BaseAgent {
   constructor() {
     super("ENGAGEMENT");
+  }
+
+  /**
+   * STATIC: Load from DB prompt template if available
+   */
+  protected async getStaticSystemPrompt(orgContext: OrgContext): Promise<string> {
+    const input = orgContext._input as EngagementInput;
+    if (!input?.brandConfig) {
+      return "You are a social media community manager.";
+    }
+
+    // Try to load from DB first
+    try {
+      const variables = {
+        brandName: input.brandConfig.brandName,
+        voiceAdjectives: input.brandConfig.voiceTone.adjectives.join(", "),
+        voiceExamples: input.brandConfig.voiceTone.examples.join("\n"),
+        voiceAvoid: input.brandConfig.voiceTone.avoid.join("\n"),
+        faqKnowledge: input.brandConfig.faqKnowledge
+          .map((f) => `Q: ${f.question}\nA: ${f.answer}`)
+          .join("\n\n"),
+        doNots: input.brandConfig.doNots.join("\n"),
+      };
+
+      const dbPrompt = await this.getPromptFromTemplate("main", variables);
+      if (dbPrompt) {
+        return dbPrompt;
+      }
+    } catch (error) {
+      console.warn("Failed to load DB prompt for EngagementAgent:", error);
+    }
+
+    // Fallback to hardcoded
+    return buildEngagementPrompt({
+      ...input,
+      platform: input.platform.toString(),
+    });
   }
 
   async execute(input: EngagementInput) {

@@ -1,5 +1,4 @@
-import { BaseAgent } from "./shared/base-agent";
-import type { AgentResult } from "./shared/base-agent";
+import { BaseAgent, type AgentResult, type OrgContext } from "./shared/base-agent";
 import { z } from "zod";
 import { ComplianceResultSchema, type ComplianceInput } from "@/lib/ai/schemas/compliance";
 
@@ -8,8 +7,31 @@ export class ComplianceAgent extends BaseAgent {
     super("COMPLIANCE");
   }
 
+  protected async getStaticSystemPrompt(orgContext: OrgContext): Promise<string> {
+    const input = orgContext as unknown as ComplianceInput;
+
+    try {
+      return await this.getPromptFromTemplate("main", {
+        brandName: input.brandConfig.brandName,
+        industry: input.brandConfig.industry,
+        doNots: JSON.stringify(input.brandConfig.doNots),
+        regulatoryNotes: input.brandConfig.regulatoryNotes || "",
+        platform: input.content.platform,
+        contentType: input.content.contentType,
+        caption: input.content.caption,
+        hashtags: JSON.stringify(input.content.hashtags),
+        altText: input.content.altText || "",
+        linkUrl: input.content.linkUrl || "",
+      });
+    } catch {
+      return `You are a compliance and brand safety expert. You review content for regulatory compliance, brand guidelines, platform ToS, and copyright issues. Always respond with valid JSON.`;
+    }
+  }
+
   async execute(input: ComplianceInput): Promise<AgentResult<z.infer<typeof ComplianceResultSchema>>> {
-    const systemPrompt = `You are a compliance and brand safety expert. You review content for regulatory compliance, brand guidelines, platform ToS, and copyright issues. Always respond with valid JSON.`;
+    const orgContext: OrgContext = input as unknown as OrgContext;
+
+    const systemPrompt = await this.buildCachedPrompt(orgContext);
 
     const userPrompt = `Check the following content for compliance issues:
 

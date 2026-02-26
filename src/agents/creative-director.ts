@@ -34,7 +34,7 @@ import {
 import { recordAssetUsage, findRelevantAssets } from "@/lib/visual/asset-manager";
 
 // Base Agent
-import { BaseAgent, type AgentResult } from "./shared/base-agent";
+import { BaseAgent, type AgentResult, type OrgContext } from "./shared/base-agent";
 
 // Output schema
 const VisualOutputSchema = z.object({
@@ -105,6 +105,23 @@ interface CreativeDirectorInput {
 export class CreativeDirectorAgent extends BaseAgent {
   constructor() {
     super("CREATIVE_DIRECTOR");
+  }
+
+  protected async getStaticSystemPrompt(orgContext: OrgContext): Promise<string> {
+    const input = orgContext as unknown as CreativeDirectorInput;
+
+    try {
+      return await this.getPromptFromTemplate("main", {
+        organizationId: input.organizationId,
+        contentId: input.contentId,
+        caption: input.caption || "",
+        contentType: input.contentType || "",
+        platform: input.platform || "",
+        topic: input.topic || "",
+      });
+    } catch {
+      return `You are a creative director for social media content. You create visual assets that align with brand identity and engage audiences.`;
+    }
   }
 
   async execute(input: CreativeDirectorInput): Promise<{

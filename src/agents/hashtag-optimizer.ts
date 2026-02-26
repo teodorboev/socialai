@@ -1,4 +1,4 @@
-import { BaseAgent, AgentResult } from "./shared/base-agent";
+import { BaseAgent, AgentResult, type OrgContext } from "./shared/base-agent";
 import { AgentName } from "@prisma/client";
 import { z } from "zod";
 import { HashtagOptimizerSchema, HashtagOptimizerInputSchema, type HashtagOptimizerInput, type HashtagOptimizer } from "@/lib/ai/schemas/hashtag-optimizer";
@@ -8,36 +8,32 @@ export class HashtagOptimizerAgent extends BaseAgent {
     super("HASHTAG_OPTIMIZER", "claude-sonnet-4-20250514");
   }
 
+  protected async getStaticSystemPrompt(orgContext: OrgContext): Promise<string> {
+    const input = orgContext as unknown as HashtagOptimizerInput;
+    const parsedInput = HashtagOptimizerInputSchema.parse(input);
+
+    try {
+      return await this.getPromptFromTemplate("main", {
+        brandName: parsedInput.brandName,
+        platform: parsedInput.platform,
+        industry: parsedInput.industry,
+        content: parsedInput.content,
+        currentHashtags: parsedInput.currentHashtags ? JSON.stringify(parsedInput.currentHashtags) : "",
+        competitorHashtags: parsedInput.competitorHashtags ? JSON.stringify(parsedInput.competitorHashtags) : "",
+        goals: parsedInput.goals ? JSON.stringify(parsedInput.goals) : "",
+      });
+    } catch {
+      return `You are a Hashtag Optimization Expert for social media.
+
+Your role is to optimize hashtags for maximum reach and relevance.`;
+    }
+  }
+
   async execute(input: HashtagOptimizerInput): Promise<AgentResult<HashtagOptimizer>> {
     const parsedInput = HashtagOptimizerInputSchema.parse(input);
 
-    const systemPrompt = `You are a Hashtag Optimization Expert for social media.
-
-Your role is to optimize hashtags for maximum reach and relevance.
-
-BRAND: ${parsedInput.brandName}
-PLATFORM: ${parsedInput.platform}
-INDUSTRY: ${parsedInput.industry}
-CONTENT: "${parsedInput.content}"
-
-CURRENT HASHTAGS: ${parsedInput.currentHashtags?.join(", ") || "None"}
-COMPETITOR HASHTAGS: ${parsedInput.competitorHashtags?.join(", ") || "None"}
-GOALS: ${parsedInput.goals?.join(", ") || "Engagement, Reach"}
-
-ANALYSIS:
-1. Research relevant hashtags by volume and competition
-2. Create optimal mix of high/medium/niche/branded
-3. Consider platform-specific best practices
-4. Recommend hashtags to avoid
-
-OPTIMAL MIX BY PLATFORM:
-- Instagram: 3-5 high, 3-5 medium, 3-5 niche, 1-2 branded
-- TikTok: 2-3 high, 2-3 medium, 2-3 niche, 1 branded
-- Twitter: 1-2 high, 1-2 medium, 1-2 niche
-- LinkedIn: 1-2 niche, 1-2 branded
-
-Respond with a JSON object matching this schema:
-${JSON.stringify(HashtagOptimizerSchema.shape, null, 2)}`;
+    const orgContext: OrgContext = input as unknown as OrgContext;
+    const systemPrompt = await this.buildCachedPrompt(orgContext);
 
     const response = await this.client.messages.create({
       model: this.model,

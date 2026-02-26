@@ -1,5 +1,4 @@
-import { BaseAgent } from "./shared/base-agent";
-import type { AgentResult } from "./shared/base-agent";
+import { BaseAgent, type AgentResult, type OrgContext } from "./shared/base-agent";
 import { z } from "zod";
 import { CompetitorReportSchema, type CompetitorIntelInput } from "@/lib/ai/schemas/competitor-intelligence";
 import { buildCompetitorIntelPrompt } from "@/lib/ai/prompts/competitor-intelligence";
@@ -9,9 +8,26 @@ export class CompetitorIntelligenceAgent extends BaseAgent {
     super("COMPETITOR_INTELLIGENCE");
   }
 
-  async execute(input: CompetitorIntelInput): Promise<AgentResult<z.infer<typeof CompetitorReportSchema>>> {
-    const systemPrompt = `You are an expert competitive intelligence analyst specializing in social media marketing. You analyze competitor strategies and provide actionable insights. Always respond with valid JSON that matches the required schema.`;
+  protected async getStaticSystemPrompt(orgContext: OrgContext): Promise<string> {
+    const input = orgContext as unknown as CompetitorIntelInput;
 
+    try {
+      return await this.getPromptFromTemplate("main", {
+        organizationId: input.organizationId,
+        brandName: input.brandConfig.brandName,
+        industry: input.brandConfig.industry,
+        competitors: JSON.stringify(input.competitors),
+        previousReport: input.previousReport ? JSON.stringify(input.previousReport) : "",
+        clientMetrics: JSON.stringify(input.clientMetrics),
+      });
+    } catch {
+      return `You are an expert competitive intelligence analyst specializing in social media marketing. You analyze competitor strategies and provide actionable insights. Always respond with valid JSON that matches the required schema.`;
+    }
+  }
+
+  async execute(input: CompetitorIntelInput): Promise<AgentResult<z.infer<typeof CompetitorReportSchema>>> {
+    const orgContext: OrgContext = input as unknown as OrgContext;
+    const systemPrompt = await this.buildCachedPrompt(orgContext);
     const userPrompt = buildCompetitorIntelPrompt(input);
 
     const { text, tokensUsed } = await this.callClaude({

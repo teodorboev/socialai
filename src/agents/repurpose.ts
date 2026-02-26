@@ -1,5 +1,4 @@
-import { BaseAgent } from "./shared/base-agent";
-import type { AgentResult } from "./shared/base-agent";
+import { BaseAgent, type AgentResult, type OrgContext } from "./shared/base-agent";
 import { z } from "zod";
 import { RepurposeOutputSchema, type RepurposeInput } from "@/lib/ai/schemas/repurpose";
 import { buildRepurposePrompt } from "@/lib/ai/prompts/repurpose";
@@ -9,9 +8,26 @@ export class RepurposeAgent extends BaseAgent {
     super("REPURPOSE");
   }
 
-  async execute(input: RepurposeInput): Promise<AgentResult<z.infer<typeof RepurposeOutputSchema>>> {
-    const systemPrompt = `You are an expert content repurposing specialist. You transform one piece of content into multiple platform-optimized formats. Always respond with valid JSON matching the required schema.`;
+  protected async getStaticSystemPrompt(orgContext: OrgContext): Promise<string> {
+    const input = orgContext as unknown as RepurposeInput;
 
+    try {
+      return await this.getPromptFromTemplate("main", {
+        organizationId: input.organizationId,
+        brandName: input.brandConfig.brandName,
+        sourceType: input.sourceType,
+        sourceContent: JSON.stringify(input.sourceContent),
+        targetPlatforms: JSON.stringify(input.targetPlatforms),
+        excludeFormats: input.excludeFormats ? JSON.stringify(input.excludeFormats) : "",
+      });
+    } catch {
+      return `You are an expert content repurposing specialist. You transform one piece of content into multiple platform-optimized formats. Always respond with valid JSON matching the required schema.`;
+    }
+  }
+
+  async execute(input: RepurposeInput): Promise<AgentResult<z.infer<typeof RepurposeOutputSchema>>> {
+    const orgContext: OrgContext = input as unknown as OrgContext;
+    const systemPrompt = await this.buildCachedPrompt(orgContext);
     const userPrompt = buildRepurposePrompt(input);
 
     const { text, tokensUsed } = await this.callClaude({

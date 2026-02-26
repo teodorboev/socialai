@@ -1,4 +1,4 @@
-import { BaseAgent } from "./shared/base-agent";
+import { BaseAgent, type OrgContext } from "./shared/base-agent";
 import type { AgentName, Platform } from "@prisma/client";
 import { AnalyticsReportSchema, type AnalyticsReport } from "@/lib/ai/schemas/analytics";
 import { buildAnalyticsPrompt } from "@/lib/ai/prompts/analytics";
@@ -67,10 +67,61 @@ export class AnalyticsAgent extends BaseAgent {
     super("ANALYTICS");
   }
 
+  protected async getStaticSystemPrompt(orgContext: OrgContext): Promise<string> {
+    const { brandName, periodDays, snapshots, contentPerformance, previousRecommendations } = orgContext as unknown as {
+      brandName: string;
+      periodDays: number;
+      snapshots: Array<{
+        platform: string;
+        followers: number;
+        impressions: number;
+        reach: number;
+        engagementRate: number;
+        clicks: number;
+        shares: number;
+        saves: number;
+        snapshotDate: string;
+      }>;
+      contentPerformance: Array<{
+        contentId: string;
+        platform: string;
+        contentType: string;
+        caption: string;
+        impressions: number;
+        engagement: number;
+        engagementRate: number;
+        clicks: number;
+        shares: number;
+        saves: number;
+        publishedAt: string;
+      }>;
+      previousRecommendations?: string[];
+    };
+
+    try {
+      return await this.getPromptFromTemplate("main", {
+        brandName,
+        periodDays,
+        snapshots: JSON.stringify(snapshots),
+        contentPerformance: JSON.stringify(contentPerformance),
+        previousRecommendations: previousRecommendations ? JSON.stringify(previousRecommendations) : "",
+      });
+    } catch {
+      return buildAnalyticsPrompt({
+        brandName,
+        periodDays,
+        snapshots,
+        contentPerformance,
+        previousRecommendations,
+      });
+    }
+  }
+
   async execute(input: ReportInput) {
     const { brandName, periodDays, snapshots, contentPerformance, previousRecommendations } = input;
 
-    const systemPrompt = buildAnalyticsPrompt({
+    const orgContext: OrgContext = {
+      organizationId: input.organizationId,
       brandName,
       periodDays,
       snapshots: snapshots.map((s) => ({
@@ -89,7 +140,9 @@ export class AnalyticsAgent extends BaseAgent {
         publishedAt: c.publishedAt.toISOString(),
       })),
       previousRecommendations,
-    });
+    };
+
+    const systemPrompt = await this.buildCachedPrompt(orgContext);
 
     const { text, tokensUsed } = await this.callClaude({
       system: systemPrompt,

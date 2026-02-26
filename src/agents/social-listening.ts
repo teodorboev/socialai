@@ -1,5 +1,4 @@
-import { BaseAgent } from "./shared/base-agent";
-import type { AgentResult } from "./shared/base-agent";
+import { BaseAgent, type AgentResult, type OrgContext } from "./shared/base-agent";
 import { z } from "zod";
 import { ListeningReportSchema, type SocialListeningInput } from "@/lib/ai/schemas/social-listening";
 import { buildSocialListeningPrompt } from "@/lib/ai/prompts/social-listening";
@@ -9,9 +8,28 @@ export class SocialListeningAgent extends BaseAgent {
     super("SOCIAL_LISTENING");
   }
 
-  async execute(input: SocialListeningInput): Promise<AgentResult<z.infer<typeof ListeningReportSchema>>> {
-    const systemPrompt = `You are a social listening and brand monitoring expert. You analyze mentions, detect sentiment, and identify opportunities. Always respond with valid JSON matching the required schema.`;
+  protected async getStaticSystemPrompt(orgContext: OrgContext): Promise<string> {
+    const input = orgContext as unknown as SocialListeningInput;
 
+    try {
+      return await this.getPromptFromTemplate("main", {
+        organizationId: input.organizationId,
+        brandName: input.brandConfig.brandName,
+        industry: input.brandConfig.industry,
+        competitors: JSON.stringify(input.brandConfig.competitors),
+        trackingKeywords: JSON.stringify(input.trackingKeywords),
+        trackingHashtags: JSON.stringify(input.trackingHashtags),
+        sentimentBaseline: JSON.stringify(input.sentimentBaseline),
+        recentMentions: input.recentMentions ? JSON.stringify(input.recentMentions) : "",
+      });
+    } catch {
+      return `You are a social listening and brand monitoring expert. You analyze mentions, detect sentiment, and identify opportunities. Always respond with valid JSON matching the required schema.`;
+    }
+  }
+
+  async execute(input: SocialListeningInput): Promise<AgentResult<z.infer<typeof ListeningReportSchema>>> {
+    const orgContext: OrgContext = input as unknown as OrgContext;
+    const systemPrompt = await this.buildCachedPrompt(orgContext);
     const userPrompt = buildSocialListeningPrompt(input);
 
     const { text, tokensUsed } = await this.callClaude({
