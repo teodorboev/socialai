@@ -73,10 +73,43 @@ export default function MissionControlLayout({ children }: MissionControlLayoutP
       if (criticalCount && criticalCount > 0) {
         setHasCrisis(true);
         setAiStatus("crisis");
+      } else {
+        // Fetch actual pause state from database
+        try {
+          const response = await fetch("/api/organization/pause");
+          if (response.ok) {
+            const data = await response.json();
+            if (data.isPaused) {
+              setAiStatus("paused");
+            }
+          }
+        } catch (error) {
+          console.error("Error fetching pause state:", error);
+        }
       }
     }
 
     setLoading(false);
+  }
+
+  async function togglePause() {
+    const newPausedState = aiStatus === "running";
+    
+    try {
+      const response = await fetch("/api/organization/pause", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ paused: newPausedState }),
+      });
+
+      if (response.ok) {
+        setAiStatus(newPausedState ? "paused" : "running");
+      } else {
+        console.error("Failed to toggle pause state:", response.status);
+      }
+    } catch (error) {
+      console.error("Error toggling pause:", error);
+    }
   }
 
   if (loading) {
@@ -178,7 +211,7 @@ export default function MissionControlLayout({ children }: MissionControlLayoutP
               <Button 
                 variant="ghost" 
                 size="sm"
-                onClick={() => setAiStatus("paused")}
+                onClick={togglePause}
               >
                 <Pause className="h-4 w-4 mr-1" />
                 <span className="hidden sm:inline">Pause</span>
@@ -188,7 +221,7 @@ export default function MissionControlLayout({ children }: MissionControlLayoutP
               <Button 
                 variant="ghost" 
                 size="sm"
-                onClick={() => setAiStatus("running")}
+                onClick={togglePause}
               >
                 <Play className="h-4 w-4 mr-1" />
                 <span className="hidden sm:inline">Resume</span>

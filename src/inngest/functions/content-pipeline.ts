@@ -20,6 +20,7 @@ export const contentPipeline = inngest.createFunction(
         where: {
           plan: { not: "STARTER" }, // Only paid plans
           brandConfig: { isNot: null },
+          isPaused: false, // Skip paused organizations
         },
         include: {
           brandConfig: true,

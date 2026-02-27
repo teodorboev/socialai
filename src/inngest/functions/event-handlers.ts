@@ -263,11 +263,17 @@ export const onScheduleImmediate = inngest.createFunction(
       include: {
         content: true,
         socialAccount: true,
+        organization: true,
       },
     });
 
     if (!schedule || !schedule.content || !schedule.socialAccount) {
       return { success: false, error: "Schedule not found" };
+    }
+
+    // Check if organization is paused
+    if (schedule.organization?.isPaused) {
+      return { success: false, error: "Organization is paused" };
     }
 
     // Mark as publishing

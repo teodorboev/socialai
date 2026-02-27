@@ -18,6 +18,8 @@ model Organization {
   stripeCustomerId  String?             @unique @map("stripe_customer_id")
   stripeSubId       String?             @unique @map("stripe_subscription_id")
   trialEndsAt       DateTime?           @map("trial_ends_at")
+  isPaused          Boolean              @default(false) @map("is_paused")
+  pausedAt          DateTime?            @map("paused_at")
   createdAt         DateTime            @default(now()) @map("created_at")
   updatedAt         DateTime            @updatedAt @map("updated_at")
 

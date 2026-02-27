@@ -13,12 +13,15 @@ export const publishScheduled = inngest.createFunction(
     cron: "*/5 * * * *", // Every 5 minutes
   },
   async ({ step }) => {
-    // Get all pending schedules that are due
+    // Get all pending schedules that are due (excluding paused organizations)
     const dueSchedules = await step.run("get-due-schedules", async () => {
       return prisma.schedule.findMany({
         where: {
           status: "PENDING",
           scheduledFor: { lte: new Date() },
+          organization: {
+            isPaused: false,
+          },
         },
         include: {
           content: true,
