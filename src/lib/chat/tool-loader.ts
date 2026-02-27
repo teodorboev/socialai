@@ -5,7 +5,7 @@
  * This enables the LLM to execute tools during conversations.
  */
 
-import { smartRouter, registerTool } from "@/lib/router";
+import { registerTool } from "@/lib/router";
 import * as chatTools from "@/lib/chat/tools";
 
 /**

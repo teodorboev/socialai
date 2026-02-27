@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { smartRouter, type SmartRouterRequest } from "@/lib/router";
 import { z } from "zod";
-import * as tools from "@/lib/chat/tools";
+import { registerAllTools, getToolDefinitions } from "@/lib/chat/tool-loader";
 
 const ChatRequestSchema = z.object({
   message: z.string().min(1),
@@ -48,6 +48,12 @@ export async function POST(request: NextRequest) {
     // Build system prompt with available tools
     const systemPrompt = buildSystemPrompt();
 
+    // Get tool definitions and register them
+    const toolDefinitions = getToolDefinitions();
+    
+    // Register all tools (this only needs to happen once, but calling multiple times is safe)
+    registerAllTools();
+
     // Build messages including history
     const messages = [
       ...conversationHistory.map((msg: any) => ({
@@ -57,13 +63,15 @@ export async function POST(request: NextRequest) {
       { role: "user" as const, content: message },
     ];
 
-    // Call smart-router
+    // Call smart-router with tools
     const routerRequest: SmartRouterRequest = {
       agentName: "CHAT_ASSISTANT",
       messages,
       systemPrompt,
       maxTokens: 2000,
       organizationId: orgId,
+      tools: toolDefinitions,
+      maxToolIterations: 5,
     };
 
     const response = await smartRouter.complete(routerRequest);

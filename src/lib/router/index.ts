@@ -196,7 +196,7 @@ export async function complete(request: SmartRouterRequest): Promise<SmartRouter
 
     // Step 4: Handle tool execution loop if tools are provided
     let finalContent = response.content;
-    let totalUsage = { ...response.usage };
+    const totalUsage = { ...response.usage };
     let toolExecutions = 0;
     const maxIterations = request.maxToolIterations || 5;
 
@@ -205,7 +205,7 @@ export async function complete(request: SmartRouterRequest): Promise<SmartRouter
       const adapter = providerRegistry.getAdapter(resolvedModel.provider.name);
       if (adapter) {
         // Build conversation history including tool results
-        let conversationMessages = [...request.messages];
+        const conversationMessages = [...request.messages];
         
         // Add initial assistant message with tool calls
         conversationMessages.push({
