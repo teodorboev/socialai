@@ -2,7 +2,7 @@ import { inngest } from "../client";
 import { ContentCreatorAgent } from "@/agents/content-creator";
 import { CreativeDirectorAgent } from "@/agents/creative-director";
 import { prisma } from "@/lib/prisma";
-import { resolveAction, getContentStatusFromAction, DEFAULT_THRESHOLDS } from "@/agents/shared/confidence";
+import { resolveAction, getContentStatusFromAction, getRejectionReason, DEFAULT_THRESHOLDS } from "@/agents/shared/confidence";
 
 export const contentPipeline = inngest.createFunction(
   {
@@ -51,6 +51,7 @@ export const contentPipeline = inngest.createFunction(
               autoExecute: org.orgSettings.autoPublishThreshold,
               flagForReview: org.orgSettings.flagForReviewThreshold,
               requireReview: org.orgSettings.requireReviewThreshold,
+              autoReject: 0.20, // Default auto-reject threshold
             }
           : DEFAULT_THRESHOLDS;
 
@@ -78,6 +79,37 @@ export const contentPipeline = inngest.createFunction(
         const content = result.data as any;
         const action = resolveAction(result.confidenceScore, thresholds);
         const status = getContentStatusFromAction(action);
+
+        // Handle auto-rejection - log but don't save poor content
+        if (action === "auto_reject") {
+          const rejectionReason = getRejectionReason(result.confidenceScore);
+          console.log(`Auto-rejecting content for org ${org.id}: ${rejectionReason}`);
+          
+          // Log the rejection for learning
+          await prisma.agentLog.create({
+            data: {
+              organizationId: org.id,
+              agentName: "CONTENT_CREATOR",
+              action: "AUTO_REJECTED",
+              inputSummary: { platform: account.platform, contentType: content.contentType },
+              outputSummary: { 
+                confidenceScore: result.confidenceScore,
+                rejectionReason,
+                caption: content.caption?.substring(0, 100),
+              },
+              confidenceScore: result.confidenceScore,
+              status: "ESCALATED",
+            },
+          });
+          
+          // Try one more time with different parameters
+          return { 
+            success: false, 
+            error: "auto_retry",
+            reason: rejectionReason,
+            retry: true,
+          };
+        }
 
         // Check if we're at the daily limit
         const todayStart = new Date();

@@ -10,6 +10,8 @@ import type {
   PostMetrics,
   PlatformProfile,
   TokenPair,
+  GetRecentPostsParams,
+  RecentPost,
 } from "./types";
 import { decrypt } from "./token-manager";
 
@@ -254,6 +256,53 @@ export class MetaClient implements SocialPlatformClient {
       followingCount: result.follows_count || 0,
       postsCount: result.media_count || 0,
     };
+  }
+
+  async getRecentPosts(params: GetRecentPostsParams): Promise<RecentPost[]> {
+    const { limit = 20, daysBack = 30 } = params;
+    
+    if (!this.igUserId) {
+      // Fallback to Facebook page posts if no Instagram account
+      const since = Math.floor(Date.now() / 1000) - (daysBack * 24 * 60 * 60);
+      const result = await this.fetch<any>(
+        `/${this.pageId}/posts?fields=id,message,created_time,full_picture,shares,likes.summary(true),comments.summary(true)&access_token=${this.accessToken}&since=${since}&limit=${limit}`
+      );
+
+      return result.data?.map((post: any) => ({
+        id: post.id,
+        caption: post.message || "",
+        mediaUrls: post.full_picture ? [post.full_picture] : [],
+        mediaType: post.full_picture ? "IMAGE" : undefined,
+        postedAt: new Date(post.created_time),
+        likes: post.likes?.summary?.total_count || 0,
+        comments: post.comments?.summary?.total_count || 0,
+        shares: post.shares?.count || 0,
+        reach: 0,
+        impressions: 0,
+      })) || [];
+    }
+
+    // Get Instagram media
+    const fields = "id,caption,media_type,media_url,thumbnail_url,permalink,likes_count,comments_count,share_count,timestamp";
+    const since = new Date();
+    since.setDate(since.getDate() - daysBack);
+    
+    const result = await this.fetch<any>(
+      `/${this.igUserId}/media?fields=${fields}&access_token=${this.accessToken}&limit=${limit}&after=${since.toISOString()}`
+    );
+
+    return result.data?.map((media: any) => ({
+      id: media.id,
+      caption: media.caption || "",
+      mediaUrls: [media.media_url || media.thumbnail_url].filter(Boolean),
+      mediaType: media.media_type,
+      postedAt: new Date(media.timestamp),
+      likes: media.likes_count || 0,
+      comments: media.comments_count || 0,
+      shares: media.share_count || 0,
+      reach: 0,
+      impressions: 0,
+    })) || [];
   }
 
   async refreshToken(refreshToken: string): Promise<TokenPair> {

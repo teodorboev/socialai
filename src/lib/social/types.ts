@@ -10,6 +10,7 @@ export interface SocialPlatformClient {
   getAccountMetrics(): Promise<AccountMetrics>;
   getPostMetrics(platformPostId: string): Promise<PostMetrics>;
   getProfile(): Promise<PlatformProfile>;
+  getRecentPosts(params: GetRecentPostsParams): Promise<RecentPost[]>;
   refreshToken(refreshToken: string): Promise<TokenPair>;
 }
 
@@ -105,4 +106,22 @@ export interface TokenPair {
 export interface DateRange {
   start: Date;
   end: Date;
+}
+
+export interface GetRecentPostsParams {
+  limit: number;
+  daysBack?: number;
+}
+
+export interface RecentPost {
+  id: string;
+  caption: string;
+  mediaUrls: string[];
+  mediaType?: string;
+  postedAt: Date;
+  likes?: number;
+  comments?: number;
+  shares?: number;
+  reach?: number;
+  impressions?: number;
 }

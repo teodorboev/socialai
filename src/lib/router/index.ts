@@ -15,8 +15,27 @@ import { prisma } from "@/lib/prisma";
 import { providerRegistry } from "./providers/registry";
 import { classifyRequest, type ClassificationInput, type TaskType } from "./classifier";
 import { resolveModel, type ResolverOptions, updateModelMetrics } from "./resolver";
-import { calculateCallCost, type LLMMessage } from "./providers/base";
+import { calculateCallCost, type LLMMessage, type LLMTool, type LLMToolCall } from "./providers/base";
 import type { LLMUsageLog } from "@prisma/client";
+
+// Tool registry - maps tool names to execution functions
+type ToolExecutor = (input: Record<string, unknown>) => Promise<unknown>;
+
+const toolRegistry: Record<string, ToolExecutor> = {};
+
+/**
+ * Register a tool function that can be called by the LLM
+ */
+export function registerTool(name: string, executor: ToolExecutor) {
+  toolRegistry[name] = executor;
+}
+
+/**
+ * Unregister a tool
+ */
+export function unregisterTool(name: string) {
+  delete toolRegistry[name];
+}
 
 export interface SmartRouterRequest {
   /** Which agent is making the call (determines default tier) */
@@ -43,6 +62,10 @@ export interface SmartRouterRequest {
   stream?: boolean;
   /** Stream callback */
   onStream?: (chunk: string) => void;
+  /** Tools available for the LLM to call */
+  tools?: LLMTool[];
+  /** Maximum tool call iterations (to prevent infinite loops) */
+  maxToolIterations?: number;
 }
 
 export interface SmartRouterResponse {
@@ -119,6 +142,7 @@ export async function complete(request: SmartRouterRequest): Promise<SmartRouter
             systemPrompt: request.systemPrompt,
             temperature: request.temperature,
             maxTokens: request.maxTokens,
+            tools: request.tools,
           },
           request.onStream
         );
@@ -130,6 +154,7 @@ export async function complete(request: SmartRouterRequest): Promise<SmartRouter
           systemPrompt: request.systemPrompt,
           temperature: request.temperature,
           maxTokens: request.maxTokens,
+          tools: request.tools,
         });
       }
     } catch (error) {
@@ -151,6 +176,7 @@ export async function complete(request: SmartRouterRequest): Promise<SmartRouter
             systemPrompt: request.systemPrompt,
             temperature: request.temperature,
             maxTokens: request.maxTokens,
+            tools: request.tools,
           });
 
           response = fallbackResponse;
@@ -168,18 +194,111 @@ export async function complete(request: SmartRouterRequest): Promise<SmartRouter
       throw lastError || new Error("No response from any model");
     }
 
-    // Step 4: Calculate cost
+    // Step 4: Handle tool execution loop if tools are provided
+    let finalContent = response.content;
+    let totalUsage = { ...response.usage };
+    let toolExecutions = 0;
+    const maxIterations = request.maxToolIterations || 5;
+
+    // If tools are provided and the model wants to use them, execute the tool loop
+    if (request.tools && request.tools.length > 0 && response.toolCalls && response.toolCalls.length > 0) {
+      const adapter = providerRegistry.getAdapter(resolvedModel.provider.name);
+      if (adapter) {
+        // Build conversation history including tool results
+        let conversationMessages = [...request.messages];
+        
+        // Add initial assistant message with tool calls
+        conversationMessages.push({
+          role: "assistant",
+          content: response.content,
+        });
+
+        while (response.toolCalls && response.toolCalls.length > 0 && toolExecutions < maxIterations) {
+          toolExecutions++;
+
+          // Execute each tool call
+          const toolResults = [];
+          for (const toolCall of response.toolCalls) {
+            const executor = toolRegistry[toolCall.name];
+            if (executor) {
+              try {
+                const result = await executor(toolCall.input);
+                toolResults.push({
+                  tool_call_id: toolCall.id,
+                  name: toolCall.name,
+                  content: JSON.stringify(result),
+                });
+              } catch (error) {
+                toolResults.push({
+                  tool_call_id: toolCall.id,
+                  name: toolCall.name,
+                  content: `Error: ${error instanceof Error ? error.message : "Unknown error"}`,
+                });
+              }
+            } else {
+              toolResults.push({
+                tool_call_id: toolCall.id,
+                name: toolCall.name,
+                content: `Error: Tool '${toolCall.name}' not found`,
+              });
+            }
+          }
+
+          // Add tool results to conversation
+          for (const result of toolResults) {
+            conversationMessages.push({
+              role: "user",
+              content: result.content,
+            });
+          }
+
+          // Continue conversation with tool results
+          try {
+            response = await adapter.complete({
+              model: resolvedModel.model,
+              provider: resolvedModel.provider,
+              messages: conversationMessages,
+              systemPrompt: request.systemPrompt,
+              temperature: request.temperature,
+              maxTokens: request.maxTokens,
+              tools: request.tools,
+            });
+
+            // Accumulate usage
+            totalUsage.inputTokens += response.usage.inputTokens;
+            totalUsage.outputTokens += response.usage.outputTokens;
+            if (response.usage.cachedTokens) {
+              totalUsage.cachedTokens = (totalUsage.cachedTokens || 0) + response.usage.cachedTokens;
+            }
+
+            // Add assistant response to conversation
+            conversationMessages.push({
+              role: "assistant",
+              content: response.content,
+            });
+
+            finalContent = response.content;
+          } catch (error) {
+            // If tool execution fails, break and return what we have
+            console.error("Tool execution loop error:", error);
+            break;
+          }
+        }
+      }
+    }
+
+    // Step 5: Calculate cost
     const cost = calculateCallCost(
       resolvedModel.model,
-      response.usage.inputTokens,
-      response.usage.outputTokens,
-      response.usage.cachedTokens
+      totalUsage.inputTokens,
+      totalUsage.outputTokens,
+      totalUsage.cachedTokens
     );
 
-    // Step 5: Update model metrics
+    // Step 6: Update model metrics
     await updateModelMetrics(resolvedModel.model.id, response.latencyMs, true);
 
-    // Step 6: Log the call
+    // Step 7: Log the call
     await logLLMUsage({
       organizationId: request.organizationId,
       agentName: request.agentName,
@@ -190,10 +309,10 @@ export async function complete(request: SmartRouterRequest): Promise<SmartRouter
       providerName: resolvedModel.provider.name,
       modelId: resolvedModel.model.modelId,
       modelDisplayName: resolvedModel.model.displayName,
-      inputTokens: response.usage.inputTokens,
-      outputTokens: response.usage.outputTokens,
-      cachedTokens: response.usage.cachedTokens ?? 0,
-      totalTokens: response.usage.inputTokens + response.usage.outputTokens,
+      inputTokens: totalUsage.inputTokens,
+      outputTokens: totalUsage.outputTokens,
+      cachedTokens: totalUsage.cachedTokens ?? 0,
+      totalTokens: totalUsage.inputTokens + totalUsage.outputTokens,
       inputCost: cost.inputCost,
       outputCost: cost.outputCost,
       cacheSavings: cost.cacheSavings,
@@ -208,11 +327,11 @@ export async function complete(request: SmartRouterRequest): Promise<SmartRouter
     const totalLatencyMs = Date.now() - startTime;
 
     return {
-      content: response.content,
+      content: finalContent,
       usage: {
-        inputTokens: response.usage.inputTokens,
-        outputTokens: response.usage.outputTokens,
-      cachedTokens: response.usage.cachedTokens ?? 0,
+        inputTokens: totalUsage.inputTokens,
+        outputTokens: totalUsage.outputTokens,
+      cachedTokens: totalUsage.cachedTokens ?? 0,
         totalTokens: response.usage.inputTokens + response.usage.outputTokens,
       },
       cost,
@@ -404,4 +523,6 @@ export async function getUsageStats(options: {
 export const smartRouter = {
   complete,
   getUsageStats,
+  registerTool,
+  unregisterTool,
 };

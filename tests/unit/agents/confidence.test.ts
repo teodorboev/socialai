@@ -99,6 +99,7 @@ describe("Confidence Scoring - Action Determination", () => {
       autoExecute: 0.8,
       flagForReview: 0.6,
       requireReview: 0.4,
+      autoReject: 0.2,
     };
 
     // At 0.5 with requireReview=0.4, should queue_for_review (0.5 >= 0.4)

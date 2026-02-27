@@ -35,7 +35,7 @@ vi.mock("@/lib/prisma", () => ({
     orgSettings: {
       findUnique: vi.fn().mockResolvedValue(null),
     },
-    $transaction: vi.fn((fn: unknown) => fn({})),
+    $transaction: vi.fn((fn: (tx: any) => unknown) => fn({})) as any,
   },
 }));
 

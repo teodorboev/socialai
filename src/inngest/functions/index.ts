@@ -92,3 +92,6 @@ export { weeklyGoalCheck } from "./weekly-goal-check";
 
 // Network Intelligence
 export { monthlyNetworkAggregation } from "./monthly-network-aggregation";
+
+// Escalation Auto-Resolution
+export { autoResolveEscalations, triggerEscalationResolution } from "./escalation-auto-resolution";

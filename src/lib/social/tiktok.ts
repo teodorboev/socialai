@@ -9,6 +9,8 @@ import type {
   PostMetrics,
   PlatformProfile,
   TokenPair,
+  GetRecentPostsParams,
+  RecentPost,
 } from "./types";
 import { decrypt } from "./token-manager";
 
@@ -188,6 +190,13 @@ export class TikTokClient implements SocialPlatformClient {
       refreshToken: data.refresh_token,
       expiresAt: new Date(Date.now() + data.expires_in * 1000),
     };
+  }
+
+  async getRecentPosts(params: GetRecentPostsParams): Promise<RecentPost[]> {
+    // TikTok V2 API - video list endpoint
+    // This is a placeholder implementation - actual API call needed
+    console.log("TikTok getRecentPosts not fully implemented");
+    return [];
   }
 }
 
