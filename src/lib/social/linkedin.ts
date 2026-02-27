@@ -214,9 +214,75 @@ export class LinkedInClient implements SocialPlatformClient {
 
   async getRecentPosts(params: GetRecentPostsParams): Promise<RecentPost[]> {
     // LinkedIn API - ugcPosts endpoint
-    // This is a placeholder implementation - actual API call needed
-    console.log("LinkedIn getRecentPosts not fully implemented");
-    return [];
+    // Docs: https://learn.microsoft.com/en-us/linkedin/marketing/community-management/ugc/ugcPosts
+    try {
+      const maxCount = Math.min(params.limit || 30, 50);
+      
+      // LinkedIn uses the author URN to filter posts
+      const authorUrn = `urn:li:person:${this.userId}`;
+      
+      const response = await fetch(
+        `${this.baseUrl}/ugcPosts?q=authors&authors=List(${encodeURIComponent(authorUrn)})&count=${maxCount}&sortBy=CREATED`,
+        {
+          headers: {
+            "Authorization": `Bearer ${this.accessToken}`,
+            "Content-Type": "application/json",
+            "X-Restli-Protocol-Version": "2.0.0",
+          },
+        }
+      );
+
+      if (!response.ok) {
+        const error = await response.text();
+        console.error("LinkedIn API error:", error);
+        return [];
+      }
+
+      const data = await response.json();
+      
+      if (!data.elements) {
+        return [];
+      }
+
+      return data.elements.map((post: any) => {
+        // Extract text content
+        let caption = "";
+        if (post.specificContent?.["com.linkedin.ugc.ShareContent"]?.shareCommentary?.text) {
+          caption = post.specificContent["com.linkedin.ugc.ShareContent"].shareCommentary.text;
+        }
+
+        // Extract media (images)
+        const mediaUrls: string[] = [];
+        const media = post.specificContent?.["com.linkedin.ugc.ShareContent"]?.shareMediaCategory;
+        if (media === "IMAGE" && post.specificContent?.["com.linkedin.ugc.ShareContent"]?.media) {
+          for (const m of post.specificContent["com.linkedin.ugc.ShareContent"].media) {
+            if (m.media) {
+              mediaUrls.push(m.media);
+            }
+          }
+        }
+
+        // Get engagement metrics
+        const socialMetadata = post.socialMetadata || {};
+        
+        return {
+          id: post.id,
+          caption,
+          mediaUrls,
+          mediaType: mediaUrls.length > 1 ? "CAROUSEL_IMAGES" : (mediaUrls.length === 1 ? "IMAGE" : undefined),
+          postedAt: new Date(post.created?.time || Date.now()),
+          likes: socialMetadata.totalLikes || 0,
+          comments: socialMetadata.totalComments || 0,
+          shares: socialMetadata.totalShares || 0,
+          // LinkedIn doesn't provide reach/impressions in the posts API
+          reach: undefined,
+          impressions: undefined,
+        };
+      });
+    } catch (error) {
+      console.error("LinkedIn getRecentPosts error:", error);
+      return [];
+    }
   }
 }
 

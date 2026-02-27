@@ -209,9 +209,70 @@ export class TwitterClient implements SocialPlatformClient {
 
   async getRecentPosts(params: GetRecentPostsParams): Promise<RecentPost[]> {
     // Twitter API v2 - user tweets endpoint
-    // This is a placeholder implementation - actual API call needed
-    console.log("Twitter getRecentPosts not fully implemented");
-    return [];
+    // Docs: https://developer.twitter.com/en/docs/twitter-api/v1/tweets/timelines/api-reference/get-tweets-id
+    try {
+      const maxResults = Math.min(params.limit || 30, 100);
+      
+      const response = await fetch(
+        `${this.baseUrl}/users/${this.userId}/tweets?max_results=${maxResults}&tweet.fields=public_metrics,created_at&expansions=attachments.media_keys&media.fields=url,preview_image_url`,
+        {
+          headers: {
+            "Authorization": `Bearer ${this.accessToken}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (!response.ok) {
+        const error = await response.text();
+        console.error("Twitter API error:", error);
+        return [];
+      }
+
+      const data = await response.json();
+      
+      if (!data.data) {
+        return [];
+      }
+
+      // Build media map from includes
+      const mediaMap = new Map<string, any>();
+      if (data.includes?.media) {
+        for (const m of data.includes.media) {
+          mediaMap.set(m.media_key, m);
+        }
+      }
+
+      return data.data.map((tweet: any) => {
+        // Get media attachments
+        const mediaUrls: string[] = [];
+        if (tweet.attachments?.media_keys) {
+          for (const key of tweet.attachments.media_keys) {
+            const m = mediaMap.get(key);
+            if (m?.url) mediaUrls.push(m.url);
+            else if (m?.preview_image_url) mediaUrls.push(m.preview_image_url);
+          }
+        }
+
+        const metrics = tweet.public_metrics || {};
+        
+        return {
+          id: tweet.id,
+          caption: tweet.text || "",
+          mediaUrls,
+          mediaType: mediaUrls.length > 1 ? "CAROUSEL_IMAGES" : (mediaUrls.length === 1 ? "IMAGE" : undefined),
+          postedAt: new Date(tweet.created_at),
+          likes: metrics.like_count,
+          comments: metrics.reply_count,
+          shares: metrics.retweet_count,
+          reach: metrics.impression_count || metrics.retweet_count * 5,
+          impressions: metrics.impression_count,
+        };
+      });
+    } catch (error) {
+      console.error("Twitter getRecentPosts error:", error);
+      return [];
+    }
   }
 }
 

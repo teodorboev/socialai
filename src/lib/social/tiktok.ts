@@ -194,9 +194,49 @@ export class TikTokClient implements SocialPlatformClient {
 
   async getRecentPosts(params: GetRecentPostsParams): Promise<RecentPost[]> {
     // TikTok V2 API - video list endpoint
-    // This is a placeholder implementation - actual API call needed
-    console.log("TikTok getRecentPosts not fully implemented");
-    return [];
+    // Docs: https://developers.tiktok.com/doc/video-list-api
+    try {
+      const maxCount = Math.min(params.limit || 30, 100);
+      const fields = "id,caption,create_time,share_url,cover_image_url,like_count,comment_count,share_count";
+      
+      const response = await fetch(
+        `${this.baseUrl}/v2/video/list/?open_id=${this.openId}&max_count=${maxCount}&fields=${fields}`,
+        {
+          headers: {
+            "Authorization": `Bearer ${this.accessToken}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (!response.ok) {
+        const error = await response.text();
+        console.error("TikTok API error:", error);
+        return [];
+      }
+
+      const data = await response.json();
+      
+      if (!data.data?.videos) {
+        return [];
+      }
+
+      return data.data.videos.map((video: any) => ({
+        id: video.id,
+        caption: video.caption || "",
+        mediaUrls: [video.cover_image_url || ""].filter(Boolean),
+        mediaType: "VIDEO",
+        postedAt: new Date(video.create_time * 1000),
+        likes: video.like_count,
+        comments: video.comment_count,
+        shares: video.share_count,
+        reach: video.share_count * 10, // Estimate reach as share * 10
+        impressions: video.view_count || video.share_count * 15,
+      }));
+    } catch (error) {
+      console.error("TikTok getRecentPosts error:", error);
+      return [];
+    }
   }
 }
 
