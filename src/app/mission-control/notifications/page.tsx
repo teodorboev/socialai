@@ -36,65 +36,22 @@ interface Notification {
   actionLabel?: string;
 }
 
-// Mock notifications
-const MOCK_NOTIFICATIONS: Notification[] = [
+// Default notifications when no real data
+const DEFAULT_NOTIFICATIONS: Notification[] = [
   {
-    id: "1",
-    type: "content_ready",
-    title: "3 posts ready for review",
-    message: "Publishing tomorrow starting 9am. Approve by tonight.",
+    id: "welcome",
+    type: "ai_question",
+    title: "Welcome to SocialAI!",
+    message: "Your AI social media manager is ready. Complete your brand setup to get started.",
     read: false,
-    createdAt: "10 min ago",
-    actionUrl: "/mission-control/review",
-    actionLabel: "Preview & Approve",
-  },
-  {
-    id: "2",
-    type: "escalation",
-    title: "Customer complaint needs attention",
-    message: "A negative comment is getting traction (23 replies). AI drafted a response.",
-    read: false,
-    createdAt: "1 hour ago",
-    actionUrl: "/mission-control/engagement",
-    actionLabel: "Review Response",
-  },
-  {
-    id: "3",
-    type: "milestone",
-    title: "You hit 5,000 followers!",
-    message: "Your Instagram just crossed 5K followers. That's 127 new followers this week!",
-    read: true,
-    createdAt: "Yesterday",
-  },
-  {
-    id: "4",
-    type: "weekly_report",
-    title: "Weekly performance report ready",
-    message: "Strong week overall! Your Reels are outperforming static posts 3:1.",
-    read: true,
-    createdAt: "Yesterday",
-    actionUrl: "/mission-control/reports",
-    actionLabel: "Read Report",
-  },
-  {
-    id: "5",
-    type: "competitor_alert",
-    title: "Competitor activity detected",
-    message: "Herbivore just launched a new campaign. I've adjusted your content angle.",
-    read: true,
-    createdAt: "2 days ago",
-  },
-  {
-    id: "6",
-    type: "viral",
-    title: "Your Reel is trending!",
-    message: '"Skincare routine tips" just hit 50K views in 2 hours!',
-    read: true,
-    createdAt: "3 days ago",
+    createdAt: "Now",
+    actionUrl: "/dashboard/brand",
+    actionLabel: "Set up Brand",
   },
 ];
 
-const NOTIFICATION_ICONS: Record<NotificationType, any> = {
+// Icon mapping
+const NOTIFICATION_ICONS: Record<string, any> = {
   content_ready: Sparkles,
   daily_digest: Calendar,
   escalation: MessageCircle,
@@ -108,7 +65,7 @@ const NOTIFICATION_ICONS: Record<NotificationType, any> = {
   ai_question: MessageCircle,
 };
 
-const NOTIFICATION_COLORS: Record<NotificationType, string> = {
+const NOTIFICATION_COLORS: Record<string, string> = {
   content_ready: "text-blue-400 bg-blue-500/20",
   daily_digest: "text-purple-400 bg-purple-500/20",
   escalation: "text-orange-400 bg-orange-500/20",
@@ -132,8 +89,19 @@ export default function NotificationsPage() {
   }, []);
 
   async function loadNotifications() {
-    await new Promise(resolve => setTimeout(resolve, 300));
-    setNotifications(MOCK_NOTIFICATIONS);
+    try {
+      const response = await fetch("/api/mission-control/notifications");
+      const data = response.ok ? await response.json() : null;
+      
+      if (data?.notifications?.length > 0) {
+        setNotifications(data.notifications);
+      } else {
+        setNotifications(DEFAULT_NOTIFICATIONS);
+      }
+    } catch (error) {
+      console.error("Error loading notifications:", error);
+      setNotifications(DEFAULT_NOTIFICATIONS);
+    }
     setLoading(false);
   }
 

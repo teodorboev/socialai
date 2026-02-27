@@ -77,47 +77,53 @@ export default function AskAIPage() {
     setInput("");
     setLoading(true);
 
-    // Simulate AI response (in production, this would call Claude)
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    try {
+      // Build conversation history for context
+      const conversationHistory = messages
+        .slice(-10) // Last 10 messages for context
+        .map(m => ({
+          role: m.role,
+          content: m.content,
+        }));
 
-    const aiResponse = generateMockResponse(input.trim());
+      // Call the chat API
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          message: input.trim(),
+          conversationHistory,
+        }),
+      });
+
+      const data = await response.json();
+      
+      const aiResponse = data.response || data.error || "I apologize, but I couldn't process your request. Please try again.";
+      
+      const aiMessage: ChatMessage = {
+        id: (Date.now() + 1).toString(),
+        role: "ai",
+        content: aiResponse,
+        timestamp: new Date(),
+      };
+
+      setMessages(prev => [...prev, aiMessage]);
+    } catch (error) {
+      console.error("Chat error:", error);
+      
+      const errorMessage: ChatMessage = {
+        id: (Date.now() + 1).toString(),
+        role: "ai",
+        content: "I'm sorry, I encountered an error. Please try again.",
+        timestamp: new Date(),
+      };
+      
+      setMessages(prev => [...prev, errorMessage]);
+    }
     
-    const aiMessage: ChatMessage = {
-      id: (Date.now() + 1).toString(),
-      role: "ai",
-      content: aiResponse,
-      timestamp: new Date(),
-    };
-
-    setMessages(prev => [...prev, aiMessage]);
     setLoading(false);
-  }
-
-  function generateMockResponse(userInput: string): string {
-    const lower = userInput.toLowerCase();
-    
-    if (lower.includes("reel") || lower.includes("video")) {
-      return "Agreed—your Reels are getting 3.2x more reach than static posts. I've updated the content mix to include 3 Reels per week instead of 1. You'll see the first new ones in tomorrow's review batch.";
-    }
-    
-    if (lower.includes("weekend")) {
-      return "Done. I've removed Saturday and Sunday from your posting schedule. Your weekday content will be redistributed. Note: your audience is actually 15% more active on Sundays—want me to keep Sundays and just remove Saturdays?";
-    }
-    
-    if (lower.includes("working") || lower.includes("best") || lower.includes("performance")) {
-      return "Your top performers this month are ingredient spotlight carousels (avg 5.1% engagement) and skincare routine Reels (avg 4.8%). Product-only posts are your weakest at 1.9%. I've been shifting the mix toward educational content because of this.";
-    }
-    
-    if (lower.includes("launch") || lower.includes("product")) {
-      return "Exciting! Tell me about the product and the launch date, and I'll build a pre-launch, launch, and post-launch content campaign for it. What should I know about the product?";
-    }
-    
-    if (lower.includes("competitor")) {
-      return "I can start tracking Glow Recipe. I'll monitor their content, posting frequency, and engagement. Want me to also set up alerts for their major campaigns?";
-    }
-    
-    // Default response
-    return "Got it! I've noted that down. Is there anything else you'd like me to adjust, or would you like to know how your social media is performing?";
   }
 
   function handleSuggestedPrompt(prompt: string) {

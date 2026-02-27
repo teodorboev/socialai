@@ -54,52 +54,22 @@ interface WinItem {
   icon: string;
 }
 
-// Mock data for display
-const MOCK_METRICS: Metric[] = [
-  { value: "3,230", change: "+127", trend: "up", period: "this week" },
-  { value: "4.2%", change: "+0.8%", trend: "up", period: "this week" },
-  { value: "45.2K", change: "+12K", trend: "up", period: "this week" },
-  { value: "$2,340", change: "+$890", trend: "up", period: "weekly" },
+// Default fallback data (shown when no real data available)
+const DEFAULT_METRICS: Metric[] = [
+  { value: "0", change: "+0", trend: "neutral" as const, period: "this week" },
+  { value: "0%", change: "+0%", trend: "neutral" as const, period: "this week" },
+  { value: "0", change: "+0", trend: "neutral" as const, period: "this week" },
+  { value: "$0", change: "+$0", trend: "neutral" as const, period: "weekly" },
 ];
 
-const MOCK_ATTENTION_ITEMS: AttentionItem[] = [
-  {
-    id: "1",
-    type: "content_review",
-    title: "3 posts ready for review",
-    description: "Publishing tomorrow starting 9am",
-    actionLabel: "Preview & Approve All",
-    deadline: "Approve by tonight",
-  },
-  {
-    id: "2",
-    type: "escalated_comment",
-    title: "Customer complaint getting traction",
-    description: "23 replies - AI drafted a response",
-    actionLabel: "See response & approve",
-  },
-];
+const DEFAULT_ATTENTION_ITEMS: AttentionItem[] = [];
 
-const MOCK_ACTIVITY: ActivityItem[] = [
-  { id: "1", timestamp: "2 min ago", action: "Published", details: '"5 ingredients to avoid..." on IG', platform: "Instagram" },
-  { id: "2", timestamp: "15 min ago", action: "Replied to", details: "4 comments on yesterday's post" },
-  { id: "3", timestamp: "1 hour ago", action: "Generated", details: "5 posts for next week" },
-  { id: "4", timestamp: "3 hours ago", action: "Detected trending", details: '#CleanBeautyWeek → Creating themed post', platform: "Instagram" },
-  { id: "5", timestamp: "Yesterday", action: "Weekly report", details: "Sent to your email" },
-  { id: "6", timestamp: "Yesterday", action: "Competitor alert", details: 'Herbivore launched new campaign → Adjusting content' },
-];
+const DEFAULT_ACTIVITY: ActivityItem[] = [];
 
-const MOCK_COMING_UP: ComingUpItem[] = [
-  { id: "1", time: "Today 6pm", platform: "Instagram", contentType: "Reel", preview: "skincare routine tips" },
-  { id: "2", time: "Tomorrow 9am", platform: "Instagram", contentType: "Carousel", preview: "top 5 ingredients" },
-  { id: "3", time: "Tomorrow 8am", platform: "LinkedIn", contentType: "Post", preview: "industry trend analysis" },
-];
+const DEFAULT_COMING_UP: ComingUpItem[] = [];
 
-const MOCK_WINS: WinItem[] = [
-  { id: "1", type: "viral", description: "Reel hit 12K views", icon: "🔥" },
-  { id: "2", type: "followers", description: "127 new followers", icon: "💛" },
-  { id: "3", type: "clicks", description: "34 website clicks from Tuesday's carousel", icon: "🛒" },
-  { id: "4", type: "review", description: "5-star review on Google → AI responded", icon: "⭐" },
+const DEFAULT_WINS: WinItem[] = [
+  { id: "welcome-1", type: "conversion", description: "Welcome! Set up your brand to get started.", icon: "✨" },
 ];
 
 const PLATFORM_ICONS: Record<string, any> = {
@@ -121,15 +91,98 @@ export default function MissionControlPage() {
   }, []);
 
   async function loadDashboardData() {
-    // In production, this would fetch from the database
-    // For now, use mock data with a loading delay
-    await new Promise(resolve => setTimeout(resolve, 500));
+    try {
+      // Fetch overview data (metrics, attention items, coming up)
+      const [overviewRes, activityRes, winsRes] = await Promise.all([
+        fetch("/api/mission-control/overview"),
+        fetch("/api/mission-control/activity?limit=6"),
+        fetch("/api/mission-control/wins"),
+      ]);
+
+      const overviewData = overviewRes.ok ? await overviewRes.json() : null;
+      const activityData = activityRes.ok ? await activityRes.json() : null;
+      const winsData = winsRes.ok ? await winsRes.json() : null;
+
+      // Set metrics from overview
+      if (overviewData?.metrics) {
+        const m = overviewData.metrics;
+        setMetrics([
+          m.followers,
+          m.engagement,
+          m.reach,
+          m.roi,
+        ]);
+      } else {
+        setMetrics(DEFAULT_METRICS);
+      }
+
+      // Set attention items from overview
+      if (overviewData?.attentionItems?.count > 0) {
+        const count = overviewData.attentionItems.count;
+        const pendingReviews = overviewData.attentionItems.pendingReviews || 0;
+        const escalations = overviewData.attentionItems.openEscalations || 0;
+        
+        const items: AttentionItem[] = [];
+        if (pendingReviews > 0) {
+          items.push({
+            id: "content-review",
+            type: "content_review",
+            title: `${pendingReviews} post${pendingReviews > 1 ? "s" : ""} ready for review`,
+            description: "Publishing soon - review before they go live",
+            actionLabel: "Preview & Approve",
+          });
+        }
+        if (escalations > 0) {
+          items.push({
+            id: "escalations",
+            type: "escalated_comment",
+            title: `${escalations} escalat${escalations > 1 ? "ions" : "ion"} needs attention`,
+            description: "AI needs human input",
+            actionLabel: "Review",
+          });
+        }
+        setAttentionItems(items);
+      } else {
+        setAttentionItems(DEFAULT_ATTENTION_ITEMS);
+      }
+
+      // Set activity
+      if (activityData?.activities?.length > 0) {
+        setActivity(activityData.activities.slice(0, 6));
+      } else {
+        setActivity(DEFAULT_ACTIVITY);
+      }
+
+      // Set coming up from overview
+      if (overviewData?.comingUp?.items?.length > 0) {
+        const upcoming = overviewData.comingUp.items.slice(0, 3).map((item: any) => ({
+          id: item.id,
+          time: item.timeLabel,
+          platform: item.platform,
+          contentType: item.contentType,
+          preview: item.preview,
+        }));
+        setComingUp(upcoming);
+      } else {
+        setComingUp(DEFAULT_COMING_UP);
+      }
+
+      // Set wins
+      if (winsData?.wins?.length > 0) {
+        setWins(winsData.wins.slice(0, 4));
+      } else {
+        setWins(DEFAULT_WINS);
+      }
+    } catch (error) {
+      console.error("Error loading dashboard data:", error);
+      // Use defaults on error
+      setMetrics(DEFAULT_METRICS);
+      setAttentionItems(DEFAULT_ATTENTION_ITEMS);
+      setActivity(DEFAULT_ACTIVITY);
+      setComingUp(DEFAULT_COMING_UP);
+      setWins(DEFAULT_WINS);
+    }
     
-    setMetrics(MOCK_METRICS);
-    setAttentionItems(MOCK_ATTENTION_ITEMS);
-    setActivity(MOCK_ACTIVITY);
-    setComingUp(MOCK_COMING_UP);
-    setWins(MOCK_WINS);
     setLoading(false);
   }
 

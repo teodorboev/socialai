@@ -18,20 +18,9 @@ interface ActivityItem {
   status?: "success" | "pending" | "failed";
 }
 
-// Mock data
-const MOCK_ACTIVITY: ActivityItem[] = [
-  { id: "1", timestamp: "2 min ago", agent: "Publisher", action: "Published", details: '"5 ingredients to avoid in skincare" on Instagram', platform: "Instagram", status: "success" },
-  { id: "2", timestamp: "15 min ago", agent: "Engagement", action: "Replied to", details: "4 comments on yesterday's post", platform: "Instagram", status: "success" },
-  { id: "3", timestamp: "1 hour ago", agent: "ContentCreator", action: "Generated", details: "5 posts for next week", status: "success" },
-  { id: "4", timestamp: "2 hours ago", agent: "TrendScout", action: "Detected trending", details: '#CleanBeautyWeek → Creating themed post for Thursday', platform: "Instagram", status: "pending" },
-  { id: "5", timestamp: "3 hours ago", agent: "Analytics", action: "Synced", details: "Updated metrics from all connected platforms", status: "success" },
-  { id: "6", timestamp: "5 hours ago", agent: "Engagement", action: "Escalated", details: "Customer complaint requires human attention", status: "pending" },
-  { id: "7", timestamp: "Yesterday", agent: "Publisher", action: "Published", details: '"Morning routine carousel" on LinkedIn', platform: "LinkedIn", status: "success" },
-  { id: "8", timestamp: "Yesterday", agent: "Analytics", action: "Report", details: "Weekly performance report sent to email", status: "success" },
-  { id: "9", timestamp: "Yesterday", agent: "CompetitorIntel", action: "Alert", details: 'Competitor "Herbivore" launched new campaign → Adjusting content angle', status: "success" },
-  { id: "10", timestamp: "2 days ago", agent: "ContentCreator", action: "Generated", details: "Content plan for next 4 weeks", status: "success" },
-  { id: "11", timestamp: "2 days ago", agent: "Strategy", action: "Created", details: "Monthly content strategy approved", status: "success" },
-  { id: "12", timestamp: "3 days ago", agent: "Publisher", action: "Published", details: '"Product launch announcement" on all platforms', status: "success" },
+// Default activity when no data
+const DEFAULT_ACTIVITY: ActivityItem[] = [
+  { id: "empty", timestamp: "Now", agent: "System", action: "Ready", details: "No activity yet. Connect social accounts to get started.", status: "success" },
 ];
 
 const AGENT_ICONS: Record<string, any> = {
@@ -62,8 +51,19 @@ export default function FeedPage() {
   }, []);
 
   async function loadActivity() {
-    await new Promise(resolve => setTimeout(resolve, 500));
-    setActivity(MOCK_ACTIVITY);
+    try {
+      const response = await fetch("/api/mission-control/activity?limit=30");
+      const data = response.ok ? await response.json() : null;
+      
+      if (data?.activities?.length > 0) {
+        setActivity(data.activities);
+      } else {
+        setActivity(DEFAULT_ACTIVITY);
+      }
+    } catch (error) {
+      console.error("Error loading activity:", error);
+      setActivity(DEFAULT_ACTIVITY);
+    }
     setLoading(false);
   }
 
