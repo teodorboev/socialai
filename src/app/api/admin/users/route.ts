@@ -74,6 +74,14 @@ export async function GET(request: Request) {
     // Get IDs of filtered members for pagination
     const filteredIds = filteredByStatus.map(m => m.id);
 
+    // Early return if no users match the filter criteria
+    if (filteredIds.length === 0) {
+      return NextResponse.json({
+        users: [],
+        pagination: { page, limit, totalCount: 0, totalPages: 0 },
+      });
+    }
+
     // Get org members with organization and subscription details
     // Only fetch the ones that match our filters
     const orgMembers = await prismaAdmin.orgMember.findMany({

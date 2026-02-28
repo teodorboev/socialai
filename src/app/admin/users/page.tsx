@@ -12,7 +12,8 @@ import {
   Building2,
   CreditCard,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  AlertTriangle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -78,6 +79,7 @@ export default function AdminUsersPage() {
   
   const [users, setUsers] = useState<OrgMember[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   
   // Filter states
@@ -110,6 +112,7 @@ export default function AdminUsersPage() {
   // Fetch users with filters
   const fetchUsers = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       const params = new URLSearchParams();
       if (search) params.set("search", search);
@@ -125,9 +128,13 @@ export default function AdminUsersPage() {
         setUsers(data.users);
         setTotalPages(data.pagination.totalPages);
         setTotalCount(data.pagination.totalCount);
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        setError(errData.error || `Failed to fetch users (${res.status})`);
       }
     } catch (error) {
       console.error("Error fetching users:", error);
+      setError("Failed to connect to server");
     } finally {
       setLoading(false);
     }
@@ -191,6 +198,16 @@ export default function AdminUsersPage() {
           </Button>
         </Link>
       </div>
+
+      {/* Error Display */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="h-5 w-5" />
+            <span>{error}</span>
+          </div>
+        </div>
+      )}
 
       {/* Filters */}
       <Card>
