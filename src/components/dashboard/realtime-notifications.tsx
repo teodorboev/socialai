@@ -259,7 +259,7 @@ export function RealtimeNotifications({ organizationId }: RealtimeNotificationsP
                 variant="ghost"
                 className="w-full text-xs"
                 onClick={() => {
-                  window.location.href = "/dashboard/escalations";
+                  window.location.href = "/mission-control";
                 }}
               >
                 View all notifications

@@ -140,14 +140,14 @@ export default function AskAIPage() {
             Back
           </Button>
         </Link>
-        <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-          <MessageCircle className="h-6 w-6 text-blue-400" />
+        <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
+          <MessageCircle className="h-6 w-6 text-primary" />
           Talk to your AI
         </h1>
       </div>
 
       {/* Chat */}
-      <Card className="bg-slate-900/50 border-slate-800 h-[500px] flex flex-col">
+      <Card className="bg-card/50 border-border h-[500px] flex flex-col">
         <CardContent className="flex-1 overflow-y-auto p-4 space-y-4">
           {messages.map((msg) => (
             <div
@@ -156,15 +156,15 @@ export default function AskAIPage() {
             >
               <div className={`flex gap-3 max-w-[85%] ${msg.role === "user" ? "flex-row-reverse" : ""}`}>
                 <Avatar className="h-8 w-8">
-                  <AvatarFallback className={msg.role === "ai" ? "bg-blue-500" : "bg-green-500"}>
+                  <AvatarFallback className={msg.role === "ai" ? "bg-primary" : "bg-green-500"}>
                     {msg.role === "ai" ? "AI" : "You"}
                   </AvatarFallback>
                 </Avatar>
                 <div
                   className={`rounded-2xl px-4 py-3 ${
                     msg.role === "ai"
-                      ? "bg-slate-800 border border-slate-700 text-white"
-                      : "bg-blue-600 text-white"
+                      ? "bg-muted border border-input text-foreground"
+                      : "bg-primary text-foreground"
                   }`}
                 >
                   <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
@@ -179,10 +179,10 @@ export default function AskAIPage() {
             <div className="flex justify-start">
               <div className="flex gap-3">
                 <Avatar className="h-8 w-8">
-                  <AvatarFallback className="bg-blue-500">AI</AvatarFallback>
+                  <AvatarFallback className="bg-primary">AI</AvatarFallback>
                 </Avatar>
-                <div className="rounded-2xl px-4 py-3 bg-slate-800 border border-slate-700">
-                  <Loader2 className="h-5 w-5 animate-spin text-blue-400" />
+                <div className="rounded-2xl px-4 py-3 bg-muted border border-input">
+                  <Loader2 className="h-5 w-5 animate-spin text-primary" />
                 </div>
               </div>
             </div>
@@ -193,14 +193,14 @@ export default function AskAIPage() {
         {/* Suggested prompts */}
         {messages.length <= 2 && (
           <div className="px-4 pb-2">
-            <p className="text-slate-400 text-sm mb-2">Try asking:</p>
+            <p className="text-muted-foreground text-sm mb-2">Try asking:</p>
             <div className="flex flex-wrap gap-2">
               {SUGGESTED_PROMPTS.map((prompt, i) => (
                 <Button
                   key={i}
                   variant="outline"
                   size="sm"
-                  className="border-slate-700 text-slate-300 text-xs"
+                  className="border-input text-foreground/80 text-xs"
                   onClick={() => handleSuggestedPrompt(prompt)}
                 >
                   {prompt}
@@ -211,14 +211,14 @@ export default function AskAIPage() {
         )}
 
         {/* Input */}
-        <div className="p-4 border-t border-slate-800">
+        <div className="p-4 border-t border-border">
           <div className="flex gap-2">
             <Input
               placeholder="Type a message..."
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleSend()}
-              className="bg-slate-800 border-slate-700 text-white"
+              className="bg-muted border-input text-foreground"
               disabled={loading}
             />
             <Button onClick={handleSend} disabled={loading || !input.trim()}>
@@ -233,20 +233,20 @@ export default function AskAIPage() {
       </Card>
 
       {/* Available tools hint */}
-      <Card className="mt-4 bg-slate-900/30 border-slate-800">
+      <Card className="mt-4 bg-card/30 border-border">
         <CardContent className="py-3">
-          <p className="text-slate-400 text-xs mb-2">I can help you with:</p>
+          <p className="text-muted-foreground text-xs mb-2">I can help you with:</p>
           <div className="flex flex-wrap gap-2">
-            <span className="text-xs text-slate-500 flex items-center gap-1">
+            <span className="text-xs text-muted-foreground/70 flex items-center gap-1">
               <Calendar className="h-3 w-3" /> Scheduling
             </span>
-            <span className="text-xs text-slate-500 flex items-center gap-1">
+            <span className="text-xs text-muted-foreground/70 flex items-center gap-1">
               <BarChart3 className="h-3 w-3" /> Analytics
             </span>
-            <span className="text-xs text-slate-500 flex items-center gap-1">
+            <span className="text-xs text-muted-foreground/70 flex items-center gap-1">
               <Zap className="h-3 w-3" /> Content
             </span>
-            <span className="text-xs text-slate-500 flex items-center gap-1">
+            <span className="text-xs text-muted-foreground/70 flex items-center gap-1">
               <Settings className="h-3 w-3" /> Settings
             </span>
           </div>

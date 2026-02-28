@@ -42,7 +42,7 @@ export async function sendEscalationEmail(
           <p><strong>Created:</strong> ${escalation.createdAt.toLocaleString()}</p>
         </div>
         <p>Please review this item in your SocialAI dashboard.</p>
-        <a href="${process.env.NEXT_PUBLIC_SUPABASE_URL}/dashboard/escalations" 
+        <a href="${process.env.NEXT_PUBLIC_SUPABASE_URL}/mission-control/escalations" 
            style="display: inline-block; background: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">
           View Escalations
         </a>
@@ -94,7 +94,7 @@ export async function sendWeeklyReportEmail(
           ${report.summary}
         </p>
         
-        <a href="${process.env.NEXT_PUBLIC_SUPABASE_URL}/dashboard/analytics" 
+        <a href="${process.env.NEXT_PUBLIC_SUPABASE_URL}/mission-control/analytics" 
            style="display: inline-block; background: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin-top: 16px;">
           View Full Analytics
         </a>
@@ -126,7 +126,7 @@ export async function sendWelcomeEmail(toEmail: string, organizationName: string
           <li><strong>Let AI do the work:</strong> We'll start creating and scheduling content automatically</li>
         </ol>
         
-        <a href="${process.env.NEXT_PUBLIC_SUPABASE_URL}/dashboard/accounts" 
+        <a href="${process.env.NEXT_PUBLIC_SUPABASE_URL}/mission-control/accounts" 
            style="display: inline-block; background: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">
           Get Started
         </a>

@@ -52,7 +52,7 @@ export default async function proxy(request: NextRequest) {
 
     // If not super admin, redirect to dashboard
     if (!superAdmin) {
-      return NextResponse.redirect(new URL("/dashboard", request.url));
+      return NextResponse.redirect(new URL("/mission-control", request.url));
     }
   }
 

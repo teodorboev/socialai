@@ -84,7 +84,7 @@ export async function GET(request: NextRequest) {
       description: e.reason.substring(0, 100),
       priority: e.priority.toLowerCase(),
       actionLabel: "Review",
-      actionUrl: `/dashboard/escalations?id=${e.id}`,
+      actionUrl: `/mission-control/escalations?id=${e.id}`,
       createdAt: e.createdAt.toISOString(),
     }));
 
@@ -96,7 +96,7 @@ export async function GET(request: NextRequest) {
       description: c.caption?.substring(0, 80) || "No caption",
       priority: "medium" as const,
       actionLabel: "Preview & Approve",
-      actionUrl: `/dashboard/review?id=${c.id}`,
+      actionUrl: `/mission-control/review?id=${c.id}`,
       createdAt: c.createdAt.toISOString(),
     }));
 
@@ -108,7 +108,7 @@ export async function GET(request: NextRequest) {
       description: e.body?.substring(0, 80) || "No message",
       priority: "high" as const,
       actionLabel: "See response & approve",
-      actionUrl: `/dashboard/engagement?id=${e.id}`,
+      actionUrl: `/mission-control/engagement?id=${e.id}`,
       createdAt: e.createdAt.toISOString(),
     }));
 

@@ -45,7 +45,7 @@ const DEFAULT_NOTIFICATIONS: Notification[] = [
     message: "Your AI social media manager is ready. Complete your brand setup to get started.",
     read: false,
     createdAt: "Now",
-    actionUrl: "/dashboard/brand",
+    actionUrl: "/mission-control/brand",
     actionLabel: "Set up Brand",
   },
 ];
@@ -128,9 +128,9 @@ export default function NotificationsPage() {
   if (loading) {
     return (
       <div className="max-w-2xl mx-auto space-y-4">
-        <Skeleton className="h-12 w-48 bg-slate-800" />
+        <Skeleton className="h-12 w-48 bg-muted" />
         {[...Array(5)].map((_, i) => (
-          <Skeleton key={i} className="h-24 bg-slate-800" />
+          <Skeleton key={i} className="h-24 bg-muted" />
         ))}
       </div>
     );
@@ -191,7 +191,7 @@ export default function NotificationsPage() {
           return (
             <Card 
               key={notification.id} 
-              className={`bg-slate-900/50 border-slate-800 transition-all ${
+              className={`bg-card/50 border-border transition-all ${
                 !notification.read ? "border-l-4 border-l-blue-500" : ""
               }`}
             >
@@ -207,8 +207,8 @@ export default function NotificationsPage() {
                     <div className="flex items-start justify-between gap-2">
                       <div>
                         <p className="font-medium text-white">{notification.title}</p>
-                        <p className="text-slate-400 text-sm mt-1">{notification.message}</p>
-                        <p className="text-slate-500 text-xs mt-2">{notification.createdAt}</p>
+                        <p className="text-muted-foreground text-sm mt-1">{notification.message}</p>
+                        <p className="text-muted-foreground/70 text-xs mt-2">{notification.createdAt}</p>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
                         {!notification.read && (
@@ -220,7 +220,7 @@ export default function NotificationsPage() {
                           className="h-8 w-8 p-0"
                           onClick={() => dismissNotification(notification.id)}
                         >
-                          <X className="h-4 w-4 text-slate-500" />
+                          <X className="h-4 w-4 text-muted-foreground/70" />
                         </Button>
                       </div>
                     </div>
@@ -244,10 +244,10 @@ export default function NotificationsPage() {
       </div>
 
       {filteredNotifications.length === 0 && (
-        <Card className="bg-slate-900/50 border-slate-800">
+        <Card className="bg-card/50 border-border">
           <CardContent className="py-12 text-center">
             <Bell className="h-12 w-12 text-slate-600 mx-auto mb-3" />
-            <p className="text-slate-400">No notifications</p>
+            <p className="text-muted-foreground">No notifications</p>
           </CardContent>
         </Card>
       )}

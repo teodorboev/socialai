@@ -76,8 +76,8 @@ export default function FeedPage() {
   if (loading) {
     return (
       <div className="space-y-4">
-        <Skeleton className="h-12 w-48 bg-slate-800" />
-        <Skeleton className="h-96 bg-slate-800" />
+        <Skeleton className="h-12 w-48 bg-muted" />
+        <Skeleton className="h-96 bg-muted" />
       </div>
     );
   }
@@ -120,34 +120,34 @@ export default function FeedPage() {
       </div>
 
       {/* Activity List */}
-      <Card className="bg-slate-900/50 border-slate-800">
+      <Card className="bg-card/50 border-border">
         <CardContent className="p-0">
           <div className="divide-y divide-slate-800">
             {filteredActivity.map((item) => {
               const AgentIcon = AGENT_ICONS[item.agent] || Sparkles;
               return (
-                <div key={item.id} className="flex items-start gap-4 p-4 hover:bg-slate-800/30">
+                <div key={item.id} className="flex items-start gap-4 p-4 hover:bg-muted/30">
                   {/* Timestamp */}
-                  <div className="text-slate-500 text-sm w-20 shrink-0">
+                  <div className="text-muted-foreground text-sm w-20 shrink-0">
                     {item.timestamp}
                   </div>
 
                   {/* Agent Icon */}
-                  <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center shrink-0">
-                    <AgentIcon className="h-5 w-5 text-slate-400" />
+                  <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center shrink-0">
+                    <AgentIcon className="h-5 w-5 text-muted-foreground" />
                   </div>
 
                   {/* Content */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <span className="text-slate-400 text-sm">{item.agent}</span>
+                      <span className="text-muted-foreground text-sm">{item.agent}</span>
                       <span className="text-slate-600">•</span>
                       <span className="text-white font-medium">{item.action}</span>
                     </div>
-                    <p className="text-slate-300 text-sm">{item.details}</p>
+                    <p className="text-foreground/80 text-sm">{item.details}</p>
                     {item.platform && (
                       <Badge 
-                        className={`mt-2 text-xs ${PLATFORM_COLORS[item.platform] || "bg-slate-700 text-slate-300"}`}
+                        className={`mt-2 text-xs ${PLATFORM_COLORS[item.platform] || "bg-slate-700 text-foreground/80"}`}
                       >
                         {item.platform}
                       </Badge>
@@ -174,10 +174,10 @@ export default function FeedPage() {
       </Card>
 
       {filteredActivity.length === 0 && (
-        <Card className="bg-slate-900/50 border-slate-800">
+        <Card className="bg-card/50 border-border">
           <CardContent className="py-12 text-center">
             <Sparkles className="h-12 w-12 text-slate-600 mx-auto mb-3" />
-            <p className="text-slate-400">No activity to show</p>
+            <p className="text-muted-foreground">No activity to show</p>
           </CardContent>
         </Card>
       )}

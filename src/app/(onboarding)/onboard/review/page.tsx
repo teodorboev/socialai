@@ -81,7 +81,7 @@ export default function OnboardReviewPage() {
         .single();
 
       if (brandConfig) {
-        redirect("/dashboard");
+        redirect("/mission-control");
         return;
       }
     }
@@ -160,7 +160,7 @@ export default function OnboardReviewPage() {
       sessionStorage.removeItem("onboarding_proposed_plan");
 
       // Redirect to mission control
-      redirect("/dashboard");
+      redirect("/mission-control");
     } catch (error) {
       console.error("Error launching:", error);
     } finally {

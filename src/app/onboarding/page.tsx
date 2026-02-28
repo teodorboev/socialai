@@ -35,7 +35,7 @@ export default function OnboardingPage() {
         .single();
 
       if (orgMember) {
-        router.push("/dashboard");
+        router.push("/mission-control");
       }
     }
 
@@ -97,7 +97,7 @@ export default function OnboardingPage() {
     }
 
     toast.success("Organization created!");
-    router.push("/dashboard/brand");
+    router.push("/onboard");
   };
 
   return (

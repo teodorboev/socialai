@@ -187,21 +187,21 @@ export default function MissionControlPage() {
   }
 
   const MetricCard = ({ metric, icon: Icon, label }: { metric: Metric; icon: any; label: string }) => (
-    <Card className="bg-slate-900/50 border-slate-800">
+    <Card className="bg-card/50 border-border">
       <CardContent className="p-4">
         <div className="flex items-center justify-between mb-2">
-          <span className="text-slate-400 text-sm">{label}</span>
-          <Icon className="h-4 w-4 text-slate-500" />
+          <span className="text-muted-foreground text-sm">{label}</span>
+          <Icon className="h-4 w-4 text-muted-foreground/70" />
         </div>
-        <div className="text-2xl font-bold text-white">{metric.value}</div>
+        <div className="text-2xl font-bold text-foreground">{metric.value}</div>
         <div className={`flex items-center gap-1 text-sm ${
           metric.trend === "up" ? "text-green-400" : 
-          metric.trend === "down" ? "text-red-400" : "text-slate-400"
+          metric.trend === "down" ? "text-red-400" : "text-muted-foreground"
         }`}>
           {metric.trend === "up" ? <TrendingUp className="h-3 w-3" /> : 
            metric.trend === "down" ? <TrendingDown className="h-3 w-3" /> : null}
           <span>{metric.change}</span>
-          <span className="text-slate-500">· {metric.period}</span>
+          <span className="text-muted-foreground/70">· {metric.period}</span>
         </div>
       </CardContent>
     </Card>
@@ -213,13 +213,13 @@ export default function MissionControlPage() {
         {/* Metrics skeleton */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {[...Array(4)].map((_, i) => (
-            <Skeleton key={i} className="h-28 bg-slate-800" />
+            <Skeleton key={i} className="h-28 bg-muted" />
           ))}
         </div>
         {/* Attention skeleton */}
-        <Skeleton className="h-40 bg-slate-800" />
+        <Skeleton className="h-40 bg-muted" />
         {/* Activity skeleton */}
-        <Skeleton className="h-64 bg-slate-800" />
+        <Skeleton className="h-64 bg-muted" />
       </div>
     );
   }
@@ -236,9 +236,9 @@ export default function MissionControlPage() {
 
       {/* Needs Attention */}
       {attentionItems.length > 0 && (
-        <Card className="bg-slate-900/50 border-slate-800">
+        <Card className="bg-card/50 border-border">
           <CardHeader className="pb-2">
-            <CardTitle className="text-white flex items-center gap-2">
+            <CardTitle className="text-foreground flex items-center gap-2">
               <Zap className="h-5 w-5 text-yellow-400" />
               Needs Your Attention
               <Badge variant="secondary" className="ml-auto bg-yellow-500/20 text-yellow-400">
@@ -250,21 +250,21 @@ export default function MissionControlPage() {
             {attentionItems.map((item) => (
               <div 
                 key={item.id}
-                className="flex items-center justify-between p-3 bg-slate-800/50 rounded-lg"
+                className="flex items-center justify-between p-3 bg-muted/50 rounded-lg"
               >
                 <div className="flex items-center gap-3">
                   {item.type === "content_review" && <Sparkles className="h-5 w-5 text-blue-400" />}
                   {item.type === "escalated_comment" && <MessageCircle className="h-5 w-5 text-orange-400" />}
                   {item.type === "crisis_detected" && <AlertTriangle className="h-5 w-5 text-red-400" />}
                   <div>
-                    <p className="font-medium text-white">{item.title}</p>
-                    <p className="text-sm text-slate-400">{item.description}</p>
+                    <p className="font-medium text-foreground">{item.title}</p>
+                    <p className="text-sm text-muted-foreground">{item.description}</p>
                     {item.deadline && (
                       <p className="text-xs text-orange-400 mt-1">{item.deadline}</p>
                     )}
                   </div>
                 </div>
-                <Button size="sm" className="bg-blue-600 hover:bg-blue-700">
+                <Button size="sm" className="bg-primary hover:bg-primary/90">
                   {item.actionLabel}
                 </Button>
               </div>
@@ -275,24 +275,24 @@ export default function MissionControlPage() {
 
       {/* Empty attention state */}
       {attentionItems.length === 0 && (
-        <Card className="bg-slate-900/50 border-slate-800">
+        <Card className="bg-card/50 border-border">
           <CardContent className="py-8 text-center">
             <CheckCircle2 className="h-12 w-12 text-green-500 mx-auto mb-3" />
-            <p className="text-white font-medium">Nothing needs your attention</p>
-            <p className="text-slate-400 text-sm">Your AI is handling everything</p>
+            <p className="text-foreground font-medium">Nothing needs your attention</p>
+            <p className="text-muted-foreground text-sm">Your AI is handling everything</p>
           </CardContent>
         </Card>
       )}
 
       {/* AI Activity */}
-      <Card className="bg-slate-900/50 border-slate-800">
+      <Card className="bg-card/50 border-border">
         <CardHeader className="pb-2 flex flex-row items-center justify-between">
-          <CardTitle className="text-white flex items-center gap-2">
+          <CardTitle className="text-foreground flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-blue-400" />
             AI Activity
           </CardTitle>
           <Link href="/feed">
-            <Button variant="ghost" size="sm" className="text-slate-400">
+            <Button variant="ghost" size="sm" className="text-muted-foreground">
               View all <ArrowRight className="h-4 w-4 ml-1" />
             </Button>
           </Link>
@@ -301,11 +301,11 @@ export default function MissionControlPage() {
           <div className="space-y-2">
             {activity.map((item) => (
               <div key={item.id} className="flex items-start gap-3 text-sm">
-                <span className="text-slate-500 shrink-0 w-20">{item.timestamp}</span>
-                <span className="text-slate-300">{item.action}</span>
-                <span className="text-white">{item.details}</span>
+                <span className="text-muted-foreground/70 shrink-0 w-20">{item.timestamp}</span>
+                <span className="text-foreground/80">{item.action}</span>
+                <span className="text-foreground">{item.details}</span>
                 {item.platform && (
-                  <Badge variant="outline" className="text-xs border-slate-600">
+                  <Badge variant="outline" className="text-xs border-input">
                     {item.platform}
                   </Badge>
                 )}
@@ -318,9 +318,9 @@ export default function MissionControlPage() {
       {/* Coming Up + Wins */}
       <div className="grid lg:grid-cols-2 gap-4">
         {/* Coming Up */}
-        <Card className="bg-slate-900/50 border-slate-800">
+        <Card className="bg-card/50 border-border">
           <CardHeader className="pb-2">
-            <CardTitle className="text-white flex items-center gap-2">
+            <CardTitle className="text-foreground flex items-center gap-2">
               <Calendar className="h-5 w-5 text-purple-400" />
               Coming Up
             </CardTitle>
@@ -330,12 +330,12 @@ export default function MissionControlPage() {
               const Icon = PLATFORM_ICONS[item.platform] || Globe;
               return (
                 <div key={item.id} className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-slate-800 rounded-lg flex items-center justify-center">
-                    <Icon className="h-5 w-5 text-slate-400" />
+                  <div className="w-10 h-10 bg-muted rounded-lg flex items-center justify-center">
+                    <Icon className="h-5 w-5 text-muted-foreground" />
                   </div>
                   <div className="flex-1">
-                    <p className="text-white text-sm">{item.time}</p>
-                    <p className="text-slate-400 text-xs">
+                    <p className="text-foreground text-sm">{item.time}</p>
+                    <p className="text-muted-foreground text-xs">
                       {item.platform} {item.contentType}: {item.preview}
                     </p>
                   </div>
@@ -343,7 +343,7 @@ export default function MissionControlPage() {
               );
             })}
             <Link href="/calendar">
-              <Button variant="ghost" size="sm" className="w-full text-slate-400 mt-2">
+              <Button variant="ghost" size="sm" className="w-full text-muted-foreground mt-2">
                 See full calendar <ArrowRight className="h-4 w-4 ml-1" />
               </Button>
             </Link>
@@ -351,9 +351,9 @@ export default function MissionControlPage() {
         </Card>
 
         {/* Wins */}
-        <Card className="bg-slate-900/50 border-slate-800">
+        <Card className="bg-card/50 border-border">
           <CardHeader className="pb-2">
-            <CardTitle className="text-white flex items-center gap-2">
+            <CardTitle className="text-foreground flex items-center gap-2">
               <Trophy className="h-5 w-5 text-yellow-400" />
               Wins This Week
             </CardTitle>
@@ -362,7 +362,7 @@ export default function MissionControlPage() {
             {wins.map((win) => (
               <div key={win.id} className="flex items-center gap-3">
                 <span className="text-2xl">{win.icon}</span>
-                <p className="text-white text-sm">{win.description}</p>
+                <p className="text-foreground text-sm">{win.description}</p>
               </div>
             ))}
           </CardContent>
@@ -370,9 +370,9 @@ export default function MissionControlPage() {
       </div>
 
       {/* Weekly Pulse */}
-      <Card className="bg-gradient-to-r from-blue-900/30 to-purple-900/30 border-slate-800">
+      <Card className="bg-gradient-to-r from-blue-900/30 to-purple-900/30 border-border">
         <CardHeader className="pb-2">
-          <CardTitle className="text-white flex items-center gap-2">
+          <CardTitle className="text-foreground flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-blue-400" />
             Weekly Pulse
           </CardTitle>
@@ -388,7 +388,7 @@ export default function MissionControlPage() {
               />
             ))}
           </div>
-          <p className="text-slate-300">
+          <p className="text-foreground/80">
             Strong week overall. Your ingredient spotlight posts continue to outperform — I'm creating more of those. 
             LinkedIn engagement dipped slightly, likely due to the holiday. Adjusting next week's schedule to compensate.
           </p>

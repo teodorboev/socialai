@@ -9,11 +9,11 @@ export async function GET(request: Request) {
   const error = searchParams.get("error");
 
   if (error) {
-    return NextResponse.redirect(`/dashboard/accounts?error=${encodeURIComponent(error)}`);
+    return NextResponse.redirect(`/mission-control/accounts?error=${encodeURIComponent(error)}`);
   }
 
   if (!code || !state) {
-    return NextResponse.redirect("/dashboard/accounts?error=missing_params");
+    return NextResponse.redirect("/mission-control/accounts?error=missing_params");
   }
 
   // Decode state to get org and user IDs
@@ -24,7 +24,7 @@ export async function GET(request: Request) {
     orgId = decoded.orgId;
     userId = decoded.userId;
   } catch {
-    return NextResponse.redirect("/dashboard/accounts?error=invalid_state");
+    return NextResponse.redirect("/mission-control/accounts?error=invalid_state");
   }
 
   const clientId = process.env.LINKEDIN_CLIENT_ID;
@@ -32,7 +32,7 @@ export async function GET(request: Request) {
   const baseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "http://localhost:3000";
 
   if (!clientId || !clientSecret) {
-    return NextResponse.redirect("/dashboard/accounts?error=linkedin_not_configured");
+    return NextResponse.redirect("/mission-control/accounts?error=linkedin_not_configured");
   }
 
   try {
@@ -102,12 +102,12 @@ export async function GET(request: Request) {
 
     if (insertError) {
       console.error("Failed to save social account:", insertError);
-      return NextResponse.redirect("/dashboard/accounts?error=save_failed");
+      return NextResponse.redirect("/mission-control/accounts?error=save_failed");
     }
 
-    return NextResponse.redirect("/dashboard/accounts?success=connected");
+    return NextResponse.redirect("/mission-control/accounts?success=connected");
   } catch (err) {
     console.error("OAuth error:", err);
-    return NextResponse.redirect("/dashboard/accounts?error=oauth_failed");
+    return NextResponse.redirect("/mission-control/accounts?error=oauth_failed");
   }
 }

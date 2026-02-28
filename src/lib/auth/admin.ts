@@ -61,7 +61,7 @@ export async function requireOrgAdmin(): Promise<void> {
   const isAdmin = await isOrgAdmin();
   
   if (!isAdmin) {
-    redirect("/dashboard");
+    redirect("/mission-control");
   }
 }
 
@@ -72,7 +72,7 @@ export async function requireSuperAdmin(): Promise<void> {
   const isSA = await isSuperAdmin();
   
   if (!isSA) {
-    redirect("/dashboard");
+    redirect("/mission-control");
   }
 }
 

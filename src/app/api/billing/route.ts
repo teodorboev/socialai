@@ -116,8 +116,8 @@ export async function POST(request: Request) {
       const session = await createCheckoutSession(
         customerId,
         plan.priceId,
-        `${baseUrl}/dashboard/settings?success=true`,
-        `${baseUrl}/dashboard/settings?canceled=true`
+        `${baseUrl}/mission-control/settings?success=true`,
+        `${baseUrl}/mission-control/settings?canceled=true`
       );
 
       return NextResponse.json({ url: session.url });
@@ -130,7 +130,7 @@ export async function POST(request: Request) {
 
       const session = await createCustomerPortalSession(
         organization.stripeCustomerId,
-        `${baseUrl}/dashboard/settings`
+        `${baseUrl}/mission-control/settings`
       );
 
       return NextResponse.json({ url: session.url });

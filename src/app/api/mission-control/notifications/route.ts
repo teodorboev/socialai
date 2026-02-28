@@ -106,7 +106,7 @@ export async function GET(request: NextRequest) {
         message: e.reason,
         read: false,
         createdAt: timeAgo,
-        actionUrl: `/dashboard/escalations?id=${e.id}`,
+        actionUrl: `/mission-control/escalations?id=${e.id}`,
         actionLabel: "View",
         priority: "urgent",
       });
@@ -122,7 +122,7 @@ export async function GET(request: NextRequest) {
         message: e.reason,
         read: false,
         createdAt: timeAgo,
-        actionUrl: `/dashboard/escalations?id=${e.id}`,
+        actionUrl: `/mission-control/escalations?id=${e.id}`,
         actionLabel: "Review",
         priority: "urgent",
       });
@@ -139,7 +139,7 @@ export async function GET(request: NextRequest) {
           : "One post is waiting for your approval.",
         read: pendingContent < 3, // Mark as read if only a few
         createdAt: "Recently",
-        actionUrl: "/dashboard/review",
+        actionUrl: "/mission-control/review",
         actionLabel: "Preview & Approve",
         priority: pendingContent > 5 ? "urgent" : "normal",
       });
@@ -154,7 +154,7 @@ export async function GET(request: NextRequest) {
         message: "See how your content performed last week.",
         read: true,
         createdAt: getTimeAgo(weeklyReport.createdAt, now),
-        actionUrl: "/dashboard/analytics",
+        actionUrl: "/mission-control/analytics",
         actionLabel: "View Report",
         priority: "normal",
       });

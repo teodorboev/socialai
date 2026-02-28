@@ -4,9 +4,10 @@ import { createClient } from "@/lib/supabase/client";
 import { redirect } from "next/navigation";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Sparkles, MessageCircle, User, Bell, Menu, X, AlertTriangle, Pause, Play, ShieldAlert } from "lucide-react";
+import { Sparkles, MessageCircle, Bell, Menu, X, AlertTriangle, Pause, Play, ShieldAlert, Settings, Link2 } from "lucide-react";
 import Link from "next/link";
 import { CrisisIndicator } from "@/components/crisis-mode/crisis-overlay";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 type AIStatus = "running" | "paused" | "crisis";
 
@@ -114,9 +115,9 @@ export default function MissionControlLayout({ children }: MissionControlLayoutP
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+      <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="animate-pulse">
-          <Sparkles className="h-8 w-8 text-blue-400" />
+          <Sparkles className="h-8 w-8 text-primary" />
         </div>
       </div>
     );
@@ -135,10 +136,10 @@ export default function MissionControlLayout({ children }: MissionControlLayoutP
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white">
+    <div className="min-h-screen bg-background text-foreground">
       {/* Mobile menu */}
       {mobileMenuOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-950/95 backdrop-blur-sm lg:hidden">
+        <div className="fixed inset-0 z-50 bg-background/95 backdrop-blur-sm lg:hidden">
           <div className="p-4">
             <button 
               onClick={() => setMobileMenuOpen(false)}
@@ -150,14 +151,21 @@ export default function MissionControlLayout({ children }: MissionControlLayoutP
               <Link href="/mission-control" className="block py-2 text-lg font-medium">
                 Mission Control
               </Link>
-              <Link href="/mission-control/feed" className="block py-2 text-lg text-slate-400">
+              <Link href="/mission-control/feed" className="block py-2 text-lg text-muted-foreground">
                 Activity Feed
               </Link>
-              <Link href="/mission-control/ask" className="block py-2 text-lg text-slate-400">
+              <Link href="/mission-control/ask" className="block py-2 text-lg text-muted-foreground">
                 Talk to AI
               </Link>
-              <Link href="/mission-control/notifications" className="block py-2 text-lg text-slate-400">
+              <Link href="/mission-control/notifications" className="block py-2 text-lg text-muted-foreground">
                 Notifications
+              </Link>
+              <hr className="border-border my-4" />
+              <Link href="/mission-control/accounts" className="block py-2 text-lg text-muted-foreground">
+                Connected Accounts
+              </Link>
+              <Link href="/mission-control/settings/billing" className="block py-2 text-lg text-muted-foreground">
+                Settings & Billing
               </Link>
             </nav>
           </div>
@@ -165,8 +173,8 @@ export default function MissionControlLayout({ children }: MissionControlLayoutP
       )}
 
       {/* Header */}
-      <header className={`border-b bg-slate-900/50 backdrop-blur-sm sticky top-0 z-40 ${
-        aiStatus === "crisis" ? "border-red-800 bg-red-950/30" : "border-slate-800"
+      <header className={`border-b bg-background/50 backdrop-blur-sm sticky top-0 z-40 ${
+        aiStatus === "crisis" ? "border-red-800 bg-red-950/30" : "border-border"
       }`}>
         <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
           {/* Left: Menu + Logo */}
@@ -179,7 +187,7 @@ export default function MissionControlLayout({ children }: MissionControlLayoutP
             </button>
             <Link href="/mission-control" className="flex items-center gap-2">
               <div className={`w-2.5 h-2.5 rounded-full ${statusColors[aiStatus]}`} />
-              <Sparkles className="h-5 w-5 text-blue-400" />
+              <Sparkles className="h-5 w-5 text-primary" />
               <span className="font-semibold hidden sm:inline">SocialAI</span>
             </Link>
             {aiStatus === "crisis" ? (
@@ -187,14 +195,19 @@ export default function MissionControlLayout({ children }: MissionControlLayoutP
                 <CrisisIndicator />
               </Link>
             ) : (
-              <span className="hidden sm:inline text-slate-400 text-sm ml-2">
+              <span className="hidden sm:inline text-muted-foreground text-sm ml-2">
                 {statusText[aiStatus]}
               </span>
             )}
           </div>
 
           {/* Right: Actions */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
+            <Link href="/mission-control/accounts">
+              <Button variant="ghost" size="sm" title="Connected Accounts">
+                <Link2 className="h-4 w-4" />
+              </Button>
+            </Link>
             {aiStatus === "crisis" && (
               <Link href="/mission-control/crisis">
                 <Button 
@@ -243,9 +256,10 @@ export default function MissionControlLayout({ children }: MissionControlLayoutP
                 )}
               </Button>
             </Link>
-            <Link href="/settings">
-              <Button variant="ghost" size="sm">
-                <User className="h-4 w-4" />
+            <ThemeToggle />
+            <Link href="/mission-control/settings/billing">
+              <Button variant="ghost" size="sm" title="Settings">
+                <Settings className="h-4 w-4" />
               </Button>
             </Link>
           </div>

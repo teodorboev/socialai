@@ -164,21 +164,21 @@ export default function SignupWithPricingPage() {
   // Step 1: Sign Up Form
   if (step === "signup") {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-gradient-to-br from-background via-background to-background flex items-center justify-center p-4">
         <div className="w-full max-w-md">
           {/* Logo */}
           <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-blue-500 text-white text-xl font-bold mb-4">
+            <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-primary text-primary-foreground text-xl font-bold mb-4">
               S
             </div>
-            <h1 className="text-3xl font-bold text-white">Get Started</h1>
-            <p className="text-slate-400 mt-2">Create your account to begin</p>
+            <h1 className="text-3xl font-bold text-foreground">Get Started</h1>
+            <p className="text-muted-foreground mt-2">Create your account to begin</p>
           </div>
 
-          <Card className="bg-slate-800/50 border-slate-700">
+          <Card className="bg-card/50 border-border">
             <CardHeader>
-              <CardTitle className="text-white">Create Account</CardTitle>
-              <CardDescription className="text-slate-400">
+              <CardTitle className="text-foreground">Create Account</CardTitle>
+              <CardDescription className="text-muted-foreground">
                 Start your 14-day free trial
               </CardDescription>
             </CardHeader>
@@ -191,7 +191,7 @@ export default function SignupWithPricingPage() {
                 )}
                 
                 <div className="space-y-2">
-                  <Label htmlFor="fullName" className="text-slate-300">Full Name</Label>
+                  <Label htmlFor="fullName" className="text-foreground/80">Full Name</Label>
                   <Input
                     id="fullName"
                     type="text"
@@ -199,12 +199,12 @@ export default function SignupWithPricingPage() {
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
                     required
-                    className="bg-slate-700 border-slate-600 text-white"
+                    className="bg-muted border-input text-foreground"
                   />
                 </div>
                 
                 <div className="space-y-2">
-                  <Label htmlFor="email" className="text-slate-300">Email</Label>
+                  <Label htmlFor="email" className="text-foreground/80">Email</Label>
                   <Input
                     id="email"
                     type="email"
@@ -212,12 +212,12 @@ export default function SignupWithPricingPage() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
-                    className="bg-slate-700 border-slate-600 text-white"
+                    className="bg-muted border-input text-foreground"
                   />
                 </div>
                 
                 <div className="space-y-2">
-                  <Label htmlFor="password" className="text-slate-300">Password</Label>
+                  <Label htmlFor="password" className="text-foreground/80">Password</Label>
                   <Input
                     id="password"
                     type="password"
@@ -226,9 +226,9 @@ export default function SignupWithPricingPage() {
                     required
                     minLength={8}
                     placeholder="••••••••"
-                    className="bg-slate-700 border-slate-600 text-white"
+                    className="bg-muted border-input text-foreground"
                   />
-                  <p className="text-xs text-slate-500">Must be at least 8 characters</p>
+                  <p className="text-xs text-muted-foreground/70">Must be at least 8 characters</p>
                 </div>
               </CardContent>
               
@@ -242,7 +242,7 @@ export default function SignupWithPricingPage() {
                   {loading ? "Creating account..." : "Continue"}
                 </Button>
                 
-                <p className="text-sm text-slate-400">
+                <p className="text-sm text-muted-foreground">
                   Already have an account?{" "}
                   <button
                     type="button"
@@ -256,7 +256,7 @@ export default function SignupWithPricingPage() {
             </form>
           </Card>
 
-          <p className="text-center text-xs text-slate-500 mt-6">
+          <p className="text-center text-xs text-muted-foreground/70 mt-6">
             By continuing, you agree to our Terms of Service and Privacy Policy
           </p>
         </div>
@@ -271,7 +271,7 @@ export default function SignupWithPricingPage() {
       <header className="border-b bg-white">
         <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-blue-500 text-white flex items-center justify-center font-bold">
+            <div className="w-8 h-8 rounded-lg bg-primary text-primary-foreground flex items-center justify-center font-bold">
               S
             </div>
             <span className="text-lg font-bold">SocialAI</span>
@@ -325,7 +325,7 @@ export default function SignupWithPricingPage() {
                 }`}
               >
                 {plan.slug === "growth" && (
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-blue-500 text-white px-3 py-1 rounded-full text-xs font-medium">
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground px-3 py-1 rounded-full text-xs font-medium">
                     Most Popular
                   </div>
                 )}
