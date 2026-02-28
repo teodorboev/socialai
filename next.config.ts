@@ -13,7 +13,8 @@ const nextConfig: NextConfig = {
 
   // Experimental and modern features optimized for Vercel
   experimental: {
-    ppr: 'incremental',
+    // Partial Prerendering is now enabled via cacheComponents in Next.js 16
+    cacheComponents: true,
     taint: true,
     // Increased for handling media assets (images/videos) in social workflows
     serverActions: {
@@ -70,18 +71,18 @@ export default withSentryConfig(nextConfig, {
   org: process.env.SENTRY_ORG,
   project: process.env.SENTRY_PROJECT,
 
-  // Hides source maps from visitors
-  hideSourceMaps: true,
+  // Webpack-specific optimizations for Sentry (recommended for v10+)
+  webpack: {
+    treeshake: {
+      removeDebugLogging: true,
+    },
+    // Enables automatic instrumentation of Vercel Cron Monitors (moved to webpack in v10)
+    automaticVercelMonitors: true,
+  },
 
   // Upload a larger set of source maps for better stack traces
   widenClientFileUpload: true,
 
   // Route browser requests through a Next.js rewrite
   tunnelRoute: "/monitoring",
-
-  // Automatically tree-shake Sentry logger statements
-  disableLogger: true,
-
-  // Enables automatic instrumentation of Vercel Cron Monitors
-  automaticVercelMonitors: true,
 });
