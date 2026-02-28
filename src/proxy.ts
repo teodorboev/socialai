@@ -1,10 +1,11 @@
 import { createServerClient } from "@supabase/ssr";
+import { createClient } from "@supabase/supabase-js";
 import { NextResponse, type NextRequest } from "next/server";
 
 export default async function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   
-  // Create Supabase server client
+  // Create Supabase server client (anon key, handles cookies/auth session)
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -37,8 +38,13 @@ export default async function proxy(request: NextRequest) {
       return NextResponse.redirect(new URL("/login", request.url));
     }
 
-    // Check if user is super admin
-    const { data: superAdmin } = await supabase
+    // Use the service role client to bypass RLS when checking super admin status
+    const serviceClient = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+
+    const { data: superAdmin } = await serviceClient
       .from("super_admins")
       .select("id")
       .eq("user_id", user.id)
