@@ -12,9 +12,10 @@ import ReactMarkdown from "react-markdown";
 
 interface ChatMessage {
   id: string;
-  role: "user" | "ai";
+  role: "ai" | "user";
   content: string;
   timestamp: Date;
+  toolCalls?: { name: string; humanName: string }[];
 }
 
 const SUGGESTED_PROMPTS = [
@@ -108,6 +109,10 @@ export default function AskAIPage() {
         role: "ai",
         content: aiResponse,
         timestamp: new Date(),
+        toolCalls: data.toolCalls?.map((tc: any) => ({
+          name: tc.name,
+          humanName: tc.humanName,
+        })),
       };
 
       setMessages(prev => [...prev, aiMessage]);
@@ -168,6 +173,21 @@ export default function AskAIPage() {
                       : "bg-primary text-primary-foreground"
                   }`}
                 >
+                  {/* Tool calls indicator */}
+                  {msg.toolCalls && msg.toolCalls.length > 0 && (
+                    <div className="mb-2 flex flex-wrap gap-2">
+                      {msg.toolCalls.map((tc, i) => (
+                        <span 
+                          key={i} 
+                          className="inline-flex items-center gap-1 text-xs bg-primary/10 text-primary px-2 py-1 rounded-full"
+                        >
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                          {tc.humanName}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  
                   <div className="text-sm">
                     {msg.role === "ai" ? (
                       <ReactMarkdown>{msg.content}</ReactMarkdown>

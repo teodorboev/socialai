@@ -79,8 +79,16 @@ export async function POST(request: NextRequest) {
     // Parse the response - the AI should indicate if it used any tools
     const aiResponse = response.content;
 
+    // Humanize tool names for display
+    const toolCalls = response.toolCalls?.map((tc: any) => ({
+      name: tc.name,
+      input: tc.input,
+      humanName: humanizeToolName(tc.name),
+    })) || [];
+
     return NextResponse.json({
       response: aiResponse,
+      toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
       usage: {
         inputTokens: response.usage.inputTokens,
         outputTokens: response.usage.outputTokens,
@@ -214,4 +222,29 @@ When making changes:
 Now, respond to the user's message. Use tools as needed to provide accurate information.
 `;
   return toolsDescription;
+}
+
+function humanizeToolName(toolName: string): string {
+  const names: Record<string, string> = {
+    get_metrics: "Checking your metrics...",
+    get_content_status: "Looking at your content...",
+    get_escalations: "Checking escalations...",
+    get_brand_config: "Reading your brand settings...",
+    get_posting_schedule: "Checking your posting schedule...",
+    get_competitors: "Checking competitors...",
+    get_social_accounts: "Checking connected accounts...",
+    get_recent_activity: "Checking recent activity...",
+    get_goals: "Reading your goals...",
+    get_scheduled_posts: "Looking at scheduled posts...",
+    update_schedule: "Updating your schedule...",
+    add_competitor: "Adding competitor...",
+    remove_competitor: "Removing competitor...",
+    create_content_request: "Creating content...",
+    set_publishing_enabled: "Updating publishing settings...",
+    approve_content: "Approving content...",
+    reject_content: "Rejecting content...",
+    update_brand_voice: "Updating brand voice...",
+    update_do_nots: "Updating restrictions...",
+  };
+  return names[toolName] || "Working...";
 }

@@ -75,6 +75,7 @@ export interface SmartRouterResponse {
     outputTokens: number;
     cachedTokens: number;
     totalTokens: number;
+    confidence?: number;
   };
   cost: {
     inputCost: number;    // in cents
@@ -96,6 +97,12 @@ export interface SmartRouterResponse {
   latencyMs: number;
   wasFallback: boolean;
   fallbacksAttempted: number;
+  toolCalls?: {
+    name: string;
+    input: Record<string, unknown>;
+    result?: unknown;
+  }[];
+  metadata?: Record<string, unknown>;
 }
 
 /**
