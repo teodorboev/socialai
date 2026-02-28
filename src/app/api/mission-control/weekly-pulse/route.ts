@@ -10,8 +10,8 @@ import { smartRouter, type SmartRouterRequest } from "@/lib/router";
  * This provides a dynamic, narrative summary of the week's performance.
  */
 export async function GET(request: NextRequest) {
+  const supabase = await createClient();
   try {
-    const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
 
     if (!user) {
@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
 
     // Fetch analytics data for the week
     const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-    
+
     const [
       analyticsSnapshots,
       content,
@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
         },
         orderBy: { snapshotDate: "desc" },
       }),
-      
+
       prisma.content.findMany({
         where: {
           organizationId: orgId,
@@ -56,14 +56,14 @@ export async function GET(request: NextRequest) {
         },
         orderBy: { publishedAt: "desc" },
       }),
-      
+
       prisma.escalation.findMany({
         where: {
           organizationId: orgId,
           createdAt: { gte: weekAgo },
         },
       }),
-      
+
       prisma.schedule.findMany({
         where: {
           organizationId: orgId,
@@ -74,7 +74,7 @@ export async function GET(request: NextRequest) {
           socialAccount: true,
         },
       }),
-      
+
       prisma.brandConfig.findUnique({
         where: { organizationId: orgId },
       }),
@@ -87,11 +87,11 @@ export async function GET(request: NextRequest) {
       ? analyticsSnapshots.reduce((sum, a) => sum + (a.engagementRate || 0), 0) / analyticsSnapshots.length
       : 0;
     const totalFollowerChange = analyticsSnapshots.reduce((sum, a) => sum + (a.followersChange || 0), 0);
-    
+
     const publishedContent = content.filter(c => c.status === "PUBLISHED");
     const scheduledContent = content.filter(c => c.status === "SCHEDULED");
     const pendingReview = content.filter(c => c.status === "PENDING_REVIEW");
-    
+
     const platformBreakdown: Record<string, number> = {};
     for (const c of publishedContent) {
       platformBreakdown[c.platform] = (platformBreakdown[c.platform] || 0) + 1;
@@ -118,9 +118,9 @@ ${Object.entries(platformBreakdown).map(([platform, count]) => `- ${platform}: $
 
 CONTENT PERFORMANCE:
 ${publishedContent.slice(0, 5).map((c, i) => {
-  const engagement = c.confidenceScore ? (c.confidenceScore * 100).toFixed(0) : "N/A";
-  return `${i + 1}. ${c.platform} ${c.contentType}: "${c.caption?.substring(0, 50)}..." (score: ${engagement}%)`;
-}).join("\n") || "No content data"}
+      const engagement = c.confidenceScore ? (c.confidenceScore * 100).toFixed(0) : "N/A";
+      return `${i + 1}. ${c.platform} ${c.contentType}: "${c.caption?.substring(0, 50)}..." (score: ${engagement}%)`;
+    }).join("\n") || "No content data"}
 
 Generate a concise, human-readable weekly pulse summary (2-3 sentences). 
 Focus on:

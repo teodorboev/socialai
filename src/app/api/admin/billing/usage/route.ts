@@ -3,8 +3,8 @@ import { prismaAdmin } from "@/lib/prisma";
 
 // GET /api/admin/billing/usage - Get AI usage/costs
 export async function GET(request: Request) {
+  await connection();
   try {
-    await connection();
     const { searchParams } = new URL(request.url);
     const orgId = searchParams.get("organizationId");
     const period = searchParams.get("period"); // "month", "year"

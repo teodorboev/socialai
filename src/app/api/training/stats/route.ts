@@ -4,8 +4,8 @@ import { getPreferences, getExemplars } from "@/lib/training/feedback";
 import { getTrainingStats } from "@/lib/training/prompt-injection";
 
 export async function GET(request: NextRequest) {
+  const supabase = await createClient();
   try {
-    const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
 
     if (!user) {

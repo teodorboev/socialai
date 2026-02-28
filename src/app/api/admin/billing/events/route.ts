@@ -3,8 +3,8 @@ import { prismaAdmin } from "@/lib/prisma";
 
 // GET /api/admin/billing/events - List billing events
 export async function GET(request: Request) {
+  await connection();
   try {
-    await connection();
     const { searchParams } = new URL(request.url);
     const orgId = searchParams.get("organizationId");
     const eventType = searchParams.get("eventType");

@@ -11,8 +11,8 @@ import { prisma } from "@/lib/prisma";
  * - High click/content posts
  */
 export async function GET(request: NextRequest) {
+  const supabase = await createClient();
   try {
-    const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
 
     if (!user) {
@@ -58,7 +58,7 @@ export async function GET(request: NextRequest) {
           },
         },
       }),
-      
+
       // Get follower milestones
       prisma.analyticsSnapshot.findMany({
         where: {
@@ -67,7 +67,7 @@ export async function GET(request: NextRequest) {
         },
         orderBy: { snapshotDate: "desc" },
       }),
-      
+
       // Get content with high clicks
       prisma.content.findMany({
         where: {
@@ -92,7 +92,7 @@ export async function GET(request: NextRequest) {
     for (const fp of contentFingerprints) {
       const engagement = fp.engagementRate || 0;
       const reach = fp.reach || 0;
-      
+
       let description = "";
       if (reach >= 10000) {
         description = `Post hit ${(reach / 1000).toFixed(0)}K views`;
@@ -115,7 +115,7 @@ export async function GET(request: NextRequest) {
     for (const snapshot of analyticsSnapshots) {
       const change = snapshot.followersChange || 0;
       const total = snapshot.followers || 0;
-      
+
       // Check for milestone thresholds
       const milestones = [1000, 5000, 10000, 25000, 50000, 100000];
       for (const milestone of milestones) {
