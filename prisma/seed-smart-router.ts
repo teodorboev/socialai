@@ -13,15 +13,23 @@ import "dotenv/config";
 const { Pool } = pg;
 
 function createPrismaClient() {
-  const connectionString = process.env.DATABASE_URL || process.env.DIRECT_URL;
-  
+  let connectionString = process.env.DATABASE_URL || process.env.DIRECT_URL;
+
   if (!connectionString) {
     throw new Error("DATABASE_URL not set");
   }
 
+  try {
+    const url = new URL(connectionString);
+    url.searchParams.delete("pgbouncer");
+    url.searchParams.delete("connection_limit");
+    url.searchParams.delete("pool_timeout");
+    connectionString = url.toString();
+  } catch (e) { }
+
   const pool = new Pool({ connectionString });
   const adapter = new PrismaPg(pool);
-  
+
   return new PrismaClient({
     adapter,
     log: ["error"],

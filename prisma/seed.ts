@@ -6,15 +6,23 @@ import "dotenv/config";
 const { Pool } = pg;
 
 function createPrismaClient() {
-  const connectionString = process.env.DATABASE_URL || process.env.DIRECT_URL;
-  
+  let connectionString = process.env.DATABASE_URL || process.env.DIRECT_URL;
+
   if (!connectionString) {
     throw new Error("DATABASE_URL not set");
   }
 
+  try {
+    const url = new URL(connectionString);
+    url.searchParams.delete("pgbouncer");
+    url.searchParams.delete("connection_limit");
+    url.searchParams.delete("pool_timeout");
+    connectionString = url.toString();
+  } catch (e) { }
+
   const pool = new Pool({ connectionString });
   const adapter = new PrismaPg(pool);
-  
+
   return new PrismaClient({
     adapter,
     log: ["error"],
@@ -679,7 +687,7 @@ Provide multi-touch attribution modeling.`,
     { key: "agent_content_replenishment", name: "Content Replenishment", description: "Monitor content pipeline", isEnabled: true, planMinimum: null as any, category: "core" },
     { key: "agent_calendar_optimizer", name: "Calendar Optimizer", description: "Optimize posting schedule", isEnabled: true, planMinimum: null as any, category: "core" },
     { key: "agent_hashtag_optimizer", name: "Hashtag Optimizer", description: "Optimize hashtag strategy", isEnabled: true, planMinimum: null as any, category: "core" },
-    
+
     // Intelligence agents (Growth+)
     { key: "agent_competitor_intelligence", name: "Competitor Intelligence", description: "Monitor competitors", isEnabled: false, planMinimum: "GROWTH" as any, category: "intelligence" },
     { key: "agent_social_listening", name: "Social Listening", description: "Monitor brand mentions", isEnabled: false, planMinimum: "PRO" as any, category: "intelligence" },
@@ -689,7 +697,7 @@ Provide multi-touch attribution modeling.`,
     { key: "agent_caption_rewriter", name: "Caption Rewriter", description: "Rewrite underperforming content", isEnabled: false, planMinimum: "GROWTH" as any, category: "intelligence" },
     { key: "agent_brand_voice_guardian", name: "Brand Voice Guardian", description: "Maintain brand consistency", isEnabled: false, planMinimum: "GROWTH" as any, category: "intelligence" },
     { key: "agent_reporting_narrator", name: "Reporting Narrator", description: "AI-powered reports", isEnabled: false, planMinimum: "GROWTH" as any, category: "intelligence" },
-    
+
     // Premium agents (Pro+)
     { key: "agent_creative_director", name: "Creative Director", description: "Generate visual content", isEnabled: false, planMinimum: "PRO" as any, category: "premium" },
     { key: "agent_predictive_content", name: "Predictive Content", description: "Predict content performance", isEnabled: false, planMinimum: "PRO" as any, category: "premium" },
@@ -1130,13 +1138,13 @@ Provide multi-touch attribution modeling.`,
 
   for (const plan of billingPlans) {
     const { prices, ...planData } = plan;
-    
+
     const planWithDefaults = {
       ...planData,
       features: {},
       enabledAgents: [] as string[],
     };
-    
+
     const created = await prisma.billingPlan.upsert({
       where: { slug: plan.slug },
       update: planWithDefaults,

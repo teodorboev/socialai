@@ -19,15 +19,23 @@ let testPool: pg.Pool;
  * Setup test database connection
  */
 export async function setupTestDb() {
-  const connectionString = process.env.DATABASE_URL || process.env.DIRECT_URL;
-  
+  let connectionString = process.env.DATABASE_URL || process.env.DIRECT_URL;
+
   if (!connectionString) {
     throw new Error("DATABASE_URL or DIRECT_URL must be set for tests");
   }
 
+  try {
+    const url = new URL(connectionString);
+    url.searchParams.delete("pgbouncer");
+    url.searchParams.delete("connection_limit");
+    url.searchParams.delete("pool_timeout");
+    connectionString = url.toString();
+  } catch (e) { }
+
   testPool = new Pool({ connectionString });
   const adapter = new PrismaPg(testPool);
-  
+
   prisma = new PrismaClient({
     adapter,
     log: process.env.DEBUG_TESTS === "true" ? ["query", "error"] : ["error"],
@@ -35,7 +43,7 @@ export async function setupTestDb() {
 
   // Verify connection
   await prisma.$queryRaw`SELECT 1`;
-  
+
   return prisma;
 }
 
@@ -58,7 +66,7 @@ export async function teardownTestDb() {
 export async function startTransaction() {
   // Begin transaction
   await prisma.$executeRaw`BEGIN`;
-  
+
   // Return the prisma client - all operations in this test
   // will use this same connection with the transaction
   return prisma;

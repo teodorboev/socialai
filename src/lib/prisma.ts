@@ -1,11 +1,15 @@
 import { PrismaClient } from "@prisma/client";
+import { PrismaPg } from "@prisma/adapter-pg";
+import pg from "pg";
+
+const { Pool } = pg;
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
   adminPrisma: PrismaClient | undefined;
 };
 
 function createPrismaClient() {
-  const connectionString = process.env.DATABASE_URL || process.env.DIRECT_URL;
+  let connectionString = process.env.DATABASE_URL || process.env.DIRECT_URL;
 
   if (!connectionString) {
     // Fallback for build time when DATABASE_URL is not set
@@ -14,8 +18,22 @@ function createPrismaClient() {
     });
   }
 
-  // The standard Prisma engine handles pgbouncer correctly without causing "Tenant or user not found"
+  // Strip pgbouncer and other incompatible PgBouncer parameters for the pg driver
+  try {
+    const url = new URL(connectionString);
+    url.searchParams.delete("pgbouncer");
+    url.searchParams.delete("connection_limit");
+    url.searchParams.delete("pool_timeout");
+    connectionString = url.toString();
+  } catch (e) {
+    // ignore invalid URLs, let Pool handle the error
+  }
+
+  const pool = new Pool({ connectionString });
+  const adapter = new PrismaPg(pool);
+
   return new PrismaClient({
+    adapter,
     log: process.env.NODE_ENV === "development" ? ["query", "error", "warn"] : ["error"],
   });
 }
