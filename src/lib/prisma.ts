@@ -1,4 +1,4 @@
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, Prisma } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import pg from "pg";
 
@@ -11,10 +11,16 @@ const globalForPrisma = globalThis as unknown as {
 function createPrismaClient() {
   let connectionString = process.env.DATABASE_URL || process.env.DIRECT_URL;
 
+  // Only log errors by default - queries are too verbose
+  // Set PRISMA_VERBOSE=true to see queries
+  const logLevel: Prisma.LogLevel[] = process.env.PRISMA_VERBOSE === "true" 
+    ? ["query", "error", "warn"] 
+    : ["error", "warn"];
+
   if (!connectionString) {
     // Fallback for build time when DATABASE_URL is not set
     return new PrismaClient({
-      log: process.env.NODE_ENV === "development" ? ["query", "error", "warn"] : ["error"],
+      log: logLevel,
     });
   }
 
@@ -34,7 +40,7 @@ function createPrismaClient() {
 
   return new PrismaClient({
     adapter,
-    log: process.env.NODE_ENV === "development" ? ["query", "error", "warn"] : ["error"],
+    log: logLevel,
   });
 }
 
