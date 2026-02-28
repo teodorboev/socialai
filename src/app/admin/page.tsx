@@ -13,23 +13,13 @@ import { connection } from "next/server";
 
 
 async function getStats() {
-  const [
-    platformConfigCount,
-    promptTemplateCount,
-    featureFlagCount,
-    safetyConfigCount,
-    emailTemplateCount,
-    orgCount,
-    memberCount,
-  ] = await Promise.all([
-    prismaAdmin.platformConfig.count(),
-    prismaAdmin.promptTemplate.count(),
-    prismaAdmin.featureFlag.count(),
-    prismaAdmin.safetyConfig.count(),
-    prismaAdmin.emailTemplate.count(),
-    prismaAdmin.organization.count(),
-    prismaAdmin.orgMember.count(),
-  ]);
+  const platformConfigCount = await prismaAdmin.platformConfig.count();
+  const promptTemplateCount = await prismaAdmin.promptTemplate.count();
+  const featureFlagCount = await prismaAdmin.featureFlag.count();
+  const safetyConfigCount = await prismaAdmin.safetyConfig.count();
+  const emailTemplateCount = await prismaAdmin.emailTemplate.count();
+  const orgCount = await prismaAdmin.organization.count();
+  const memberCount = await prismaAdmin.orgMember.count();
 
   return {
     platformConfigCount,
