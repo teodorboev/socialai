@@ -82,7 +82,7 @@ export default function AskAIPage() {
       const conversationHistory = messages
         .slice(-10) // Last 10 messages for context
         .map(m => ({
-          role: m.role,
+          role: m.role === "ai" ? "assistant" : m.role,
           content: m.content,
         }));
 
