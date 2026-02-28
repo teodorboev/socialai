@@ -94,6 +94,7 @@ interface BillingPlanOption {
   slug: string;
   description: string | null;
   agentTier: string;
+  trialDays: number;
 }
 
 function formatPrice(amount: number, currency: string): string {
@@ -199,7 +200,7 @@ export default function UserDetailPage() {
 
   // Change subscription plan
   const handleChangePlan = async () => {
-    if (!selectedPlanId || !user?.subscription) return;
+    if (!selectedPlanId) return;
 
     setSaving(true);
     try {
@@ -220,6 +221,38 @@ export default function UserDetailPage() {
     } catch (error) {
       console.error("Error changing plan:", error);
       toast.error("Failed to change plan");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Create subscription
+  const handleCreateSubscription = async () => {
+    if (!selectedPlanId) return;
+
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/admin/users/${userId}/subscription`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          planId: selectedPlanId,
+          currency: "usd",
+          interval: "month"
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        toast.success(data.message || "Subscription created successfully");
+        loadData();
+      } else {
+        const error = await res.json();
+        toast.error(error.error || "Failed to create subscription");
+      }
+    } catch (error) {
+      console.error("Error creating subscription:", error);
+      toast.error("Failed to create subscription");
     } finally {
       setSaving(false);
     }
@@ -545,12 +578,69 @@ export default function UserDetailPage() {
             </div>
           ) : (
             <Card>
-              <CardContent className="py-8 text-center">
-                <CreditCard className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                <div className="text-lg font-medium">No Active Subscription</div>
-                <p className="text-muted-foreground">
-                  This organization does not have an active subscription.
-                </p>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <CreditCard className="h-5 w-5" />
+                  Create Subscription
+                </CardTitle>
+                <CardDescription>
+                  Add a subscription for {user.organization.name}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Plan Selection */}
+                <div className="grid gap-2">
+                  <Label htmlFor="newPlan">Select Plan</Label>
+                  <Select 
+                    value={selectedPlanId} 
+                    onValueChange={setSelectedPlanId}
+                  >
+                    <SelectTrigger id="newPlan">
+                      <SelectValue placeholder="Select a plan" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {billingPlans.map((plan) => (
+                        <SelectItem key={plan.id} value={plan.id}>
+                          {plan.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Info about selected plan */}
+                {selectedPlanId && (
+                  <div className="bg-muted rounded-lg p-4">
+                    {(() => {
+                      const selectedPlan = billingPlans.find(p => p.id === selectedPlanId);
+                      if (!selectedPlan) return null;
+                      return (
+                        <div className="space-y-2">
+                          <div className="font-medium">{selectedPlan.name}</div>
+                          {selectedPlan.description && (
+                            <div className="text-sm text-muted-foreground">
+                              {selectedPlan.description}
+                            </div>
+                          )}
+                          {selectedPlan.trialDays > 0 && (
+                            <div className="text-sm text-blue-600">
+                              Includes {selectedPlan.trialDays}-day free trial
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
+                  </div>
+                )}
+
+                <Button 
+                  onClick={handleCreateSubscription} 
+                  disabled={!selectedPlanId || saving}
+                  className="w-full"
+                >
+                  {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Create Subscription
+                </Button>
               </CardContent>
             </Card>
           )}
