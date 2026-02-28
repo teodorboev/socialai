@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Sparkles, Send, Loader2, ArrowLeft, Settings, Zap, Calendar, BarChart3, MessageCircle } from "lucide-react";
 import Link from "next/link";
+import ReactMarkdown from "react-markdown";
 
 interface ChatMessage {
   id: string;
@@ -164,10 +165,16 @@ export default function AskAIPage() {
                   className={`rounded-2xl px-4 py-3 ${
                     msg.role === "ai"
                       ? "bg-muted border border-input text-foreground"
-                      : "bg-primary text-foreground"
+                      : "bg-primary text-primary-foreground"
                   }`}
                 >
-                  <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                  <div className="text-sm">
+                    {msg.role === "ai" ? (
+                      <ReactMarkdown>{msg.content}</ReactMarkdown>
+                    ) : (
+                      <p className="whitespace-pre-wrap">{msg.content}</p>
+                    )}
+                  </div>
                   <p className="text-xs opacity-50 mt-1">
                     {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </p>

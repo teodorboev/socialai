@@ -45,6 +45,7 @@
     "react-day-picker": "^9.13.2",
     "react-dom": "19.2.3",
     "react-hook-form": "^7.71.2",
+    "react-markdown": "^10.1.0",
     "recharts": "^3.7.0",
     "resend": "^6.9.2",
     "satori": "^0.19.2",
