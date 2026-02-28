@@ -13,13 +13,50 @@ import { connection } from "next/server";
 
 
 async function getStats() {
-  const platformConfigCount = await prismaAdmin.platformConfig.count();
-  const promptTemplateCount = await prismaAdmin.promptTemplate.count();
-  const featureFlagCount = await prismaAdmin.featureFlag.count();
-  const safetyConfigCount = await prismaAdmin.safetyConfig.count();
-  const emailTemplateCount = await prismaAdmin.emailTemplate.count();
-  const orgCount = await prismaAdmin.organization.count();
-  const memberCount = await prismaAdmin.orgMember.count();
+  // Safe database queries with fallbacks for each table
+  const getCount = async (table: string) => {
+    try {
+      switch (table) {
+        case 'platformConfig':
+          return await prismaAdmin.platformConfig.count();
+        case 'promptTemplate':
+          return await prismaAdmin.promptTemplate.count();
+        case 'featureFlag':
+          return await prismaAdmin.featureFlag.count();
+        case 'safetyConfig':
+          return await prismaAdmin.safetyConfig.count();
+        case 'emailTemplate':
+          return await prismaAdmin.emailTemplate.count();
+        case 'organization':
+          return await prismaAdmin.organization.count();
+        case 'orgMember':
+          return await prismaAdmin.orgMember.count();
+        default:
+          return 0;
+      }
+    } catch (error) {
+      console.error(`Error counting ${table}:`, error);
+      return 0;
+    }
+  };
+
+  const [
+    platformConfigCount,
+    promptTemplateCount,
+    featureFlagCount,
+    safetyConfigCount,
+    emailTemplateCount,
+    orgCount,
+    memberCount,
+  ] = await Promise.all([
+    getCount('platformConfig'),
+    getCount('promptTemplate'),
+    getCount('featureFlag'),
+    getCount('safetyConfig'),
+    getCount('emailTemplate'),
+    getCount('organization'),
+    getCount('orgMember'),
+  ]);
 
   return {
     platformConfigCount,
@@ -34,7 +71,23 @@ async function getStats() {
 
 export default async function AdminOverviewPage() {
   await connection();
-  const stats = await getStats();
+  
+  let stats;
+  try {
+    stats = await getStats();
+  } catch (error) {
+    console.error("Error loading admin stats:", error);
+    // Return safe default stats if database query fails
+    stats = {
+      platformConfigCount: 0,
+      promptTemplateCount: 0,
+      featureFlagCount: 0,
+      safetyConfigCount: 0,
+      emailTemplateCount: 0,
+      orgCount: 0,
+      memberCount: 0,
+    };
+  }
 
   const cards = [
     {

@@ -31,28 +31,35 @@ export default async function proxy(request: NextRequest) {
 
   // Check admin routes - require super admin
   if (pathname.startsWith("/admin")) {
-    const { data: { user } } = await supabase.auth.getUser();
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
 
-    // If not logged in, redirect to login
-    if (!user) {
+      // If not logged in, redirect to login
+      if (!user) {
+        return NextResponse.redirect(new URL("/login", request.url));
+      }
+
+      // Use the service role client to bypass RLS when checking super admin status
+      const serviceClient = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!
+      );
+
+      // Use .maybeSingle() instead of .single() to avoid errors when no rows found
+      const { data: superAdmin } = await serviceClient
+        .from("super_admins")
+        .select("id")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      // If not super admin (or table doesn't exist), redirect to dashboard
+      if (!superAdmin) {
+        return NextResponse.redirect(new URL("/mission-control", request.url));
+      }
+    } catch (error) {
+      console.error("Admin route error:", error);
+      // If there's an error (e.g., table doesn't exist), redirect to login
       return NextResponse.redirect(new URL("/login", request.url));
-    }
-
-    // Use the service role client to bypass RLS when checking super admin status
-    const serviceClient = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
-
-    const { data: superAdmin } = await serviceClient
-      .from("super_admins")
-      .select("id")
-      .eq("user_id", user.id)
-      .single();
-
-    // If not super admin, redirect to dashboard
-    if (!superAdmin) {
-      return NextResponse.redirect(new URL("/mission-control", request.url));
     }
   }
 
