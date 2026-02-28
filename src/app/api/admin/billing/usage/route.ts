@@ -1,11 +1,10 @@
-import { NextResponse } from "next/server";
+import { NextResponse, connection } from "next/server";
 import { prismaAdmin } from "@/lib/prisma";
-
-export const dynamic = "force-dynamic";
 
 // GET /api/admin/billing/usage - Get AI usage/costs
 export async function GET(request: Request) {
   try {
+    await connection();
     const { searchParams } = new URL(request.url);
     const orgId = searchParams.get("organizationId");
     const period = searchParams.get("period"); // "month", "year"

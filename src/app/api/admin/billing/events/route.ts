@@ -1,11 +1,10 @@
-import { NextResponse } from "next/server";
+import { NextResponse, connection } from "next/server";
 import { prismaAdmin } from "@/lib/prisma";
-
-export const dynamic = "force-dynamic";
 
 // GET /api/admin/billing/events - List billing events
 export async function GET(request: Request) {
   try {
+    await connection();
     const { searchParams } = new URL(request.url);
     const orgId = searchParams.get("organizationId");
     const eventType = searchParams.get("eventType");

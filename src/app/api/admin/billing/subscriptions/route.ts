@@ -1,12 +1,11 @@
-import { NextResponse } from "next/server";
+import { NextResponse, connection } from "next/server";
 import { prismaAdmin } from "@/lib/prisma";
-
-export const dynamic = "force-dynamic";
 
 // GET /api/admin/billing/subscriptions - List all subscriptions
 // POST /api/admin/billing/subscriptions - Create subscription (manual)
 export async function GET(request: Request) {
   try {
+    await connection();
     const { searchParams } = new URL(request.url);
     const status = searchParams.get("status");
     const orgId = searchParams.get("organizationId");
