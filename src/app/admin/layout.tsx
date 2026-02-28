@@ -8,7 +8,9 @@ export default function AdminLayout({
 }) {
   return (
     <div className="min-h-screen bg-gray-50/50">
-      <AdminSidebar />
+      <Suspense fallback={<div className="hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-64 lg:flex-col bg-white border-r" />}>
+        <AdminSidebar />
+      </Suspense>
 
       {/* Main content */}
       <div className="lg:pl-64">
