@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { prismaAdmin } from "@/lib/prisma";
 
+export const dynamic = "force-dynamic";
+
 // GET /api/admin/billing/usage - Get AI usage/costs
 export async function GET(request: Request) {
   try {
@@ -9,7 +11,7 @@ export async function GET(request: Request) {
     const period = searchParams.get("period"); // "month", "year"
 
     let dateFilter: { gte: Date; lte: Date } | undefined;
-    
+
     if (period === "month") {
       const now = new Date();
       dateFilter = {
