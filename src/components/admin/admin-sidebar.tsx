@@ -17,6 +17,7 @@ import {
     BarChart3,
     Brain,
     DollarSign,
+    UserCog,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -37,6 +38,7 @@ const llmNav = [
 ];
 
 const systemNav = [
+    { name: "Users", href: "/admin/users", icon: UserCog },
     { name: "Platforms", href: "/admin/platforms", icon: Server },
     { name: "Prompts", href: "/admin/prompts", icon: FileText },
     { name: "Feature Flags", href: "/admin/flags", icon: Flag },
