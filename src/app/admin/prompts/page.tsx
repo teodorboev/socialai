@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { PromptTemplateManager } from "./prompt-template-manager";
 import { AgentName } from "@prisma/client";
+import { connection } from "next/server";
 
 
 async function getPromptTemplates() {
@@ -12,17 +13,18 @@ async function getPromptTemplates() {
   });
 }
 
-export default async function PromptsPage() {
-  const templates = await getPromptTemplates();
+export default async function AdminPromptsPage() {
+  await connection();
+  const prompts = await getPromptTemplates();
 
   // Group by agentName
-  const grouped = templates.reduce((acc, template) => {
+  const grouped = prompts.reduce((acc, template) => {
     if (!acc[template.agentName]) {
       acc[template.agentName] = [];
     }
     acc[template.agentName].push(template);
     return acc;
-  }, {} as Record<string, typeof templates>);
+  }, {} as Record<string, typeof prompts>);
 
   return (
     <div className="space-y-8">
@@ -33,7 +35,7 @@ export default async function PromptsPage() {
         </p>
       </div>
 
-      <PromptTemplateManager initialTemplates={templates} />
+      <PromptTemplateManager initialTemplates={prompts} />
     </div>
   );
 }

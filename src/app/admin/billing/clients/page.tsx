@@ -6,6 +6,7 @@
 
 import { prismaAdmin } from "@/lib/prisma";
 import { formatPrice, type SupportedCurrency } from "@/lib/billing/currency";
+import { connection } from "next/server";
 
 
 async function getBillingStats() {
@@ -111,6 +112,7 @@ async function getMonthlyCosts(orgId: string) {
 }
 
 export default async function BillingClientsPage() {
+  await connection();
   const stats = await getBillingStats();
   const subscriptions = await getClientSubscriptions();
 
@@ -189,12 +191,12 @@ export default async function BillingClientsPage() {
                   <td className="p-3">
                     <span
                       className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${sub.status === "active"
-                          ? "bg-green-100 text-green-800"
-                          : sub.status === "trialing"
-                            ? "bg-blue-100 text-blue-800"
-                            : sub.status === "past_due"
-                              ? "bg-yellow-100 text-yellow-800"
-                              : "bg-gray-100 text-gray-800"
+                        ? "bg-green-100 text-green-800"
+                        : sub.status === "trialing"
+                          ? "bg-blue-100 text-blue-800"
+                          : sub.status === "past_due"
+                            ? "bg-yellow-100 text-yellow-800"
+                            : "bg-gray-100 text-gray-800"
                         }`}
                     >
                       {sub.status}

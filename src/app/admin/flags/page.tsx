@@ -2,6 +2,7 @@ import { prismaAdmin } from "@/lib/prisma";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { FeatureFlagManager } from "./feature-flag-manager";
+import { connection } from "next/server";
 
 
 async function getFeatureFlags() {
@@ -11,6 +12,7 @@ async function getFeatureFlags() {
 }
 
 export default async function FlagsPage() {
+  await connection();
   const flags = await getFeatureFlags();
 
   return (

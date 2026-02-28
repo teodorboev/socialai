@@ -9,6 +9,7 @@ import {
   Users,
   Building2
 } from "lucide-react";
+import { connection } from "next/server";
 
 
 async function getStats() {
@@ -42,6 +43,7 @@ async function getStats() {
 }
 
 export default async function AdminOverviewPage() {
+  await connection();
   const stats = await getStats();
 
   const cards = [

@@ -1,6 +1,7 @@
 import { prismaAdmin } from "@/lib/prisma";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { connection } from "next/server";
 
 // Force dynamic rendering
 
@@ -63,8 +64,9 @@ function getEventColor(type: string): string {
 }
 
 export default async function BillingEventsPage({ searchParams }: PageProps) {
-  const params = await searchParams;
-  const events = await getEvents(params.org, params.type);
+  await connection();
+  const { org, type } = await searchParams;
+  const events = await getEvents(org, type);
   const organizations = await getOrganizations();
 
   return (
@@ -81,7 +83,7 @@ export default async function BillingEventsPage({ searchParams }: PageProps) {
         <form className="flex gap-2">
           <select
             name="org"
-            defaultValue={params.org || ""}
+            defaultValue={org || ""}
             className="h-10 rounded-md border border-input bg-background px-3 py-2"
           >
             <option value="">All Organizations</option>
@@ -93,7 +95,7 @@ export default async function BillingEventsPage({ searchParams }: PageProps) {
           </select>
           <select
             name="type"
-            defaultValue={params.type || ""}
+            defaultValue={type || ""}
             className="h-10 rounded-md border border-input bg-background px-3 py-2"
           >
             <option value="">All Event Types</option>

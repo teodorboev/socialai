@@ -1,5 +1,6 @@
 import { prismaAdmin } from "@/lib/prisma";
 import { EmailTemplateManager } from "./email-template-manager";
+import { connection } from "next/server";
 
 
 async function getEmailTemplates() {
@@ -8,7 +9,8 @@ async function getEmailTemplates() {
   });
 }
 
-export default async function EmailsPage() {
+export default async function EmailTemplatesPage() {
+  await connection();
   const templates = await getEmailTemplates();
 
   return (

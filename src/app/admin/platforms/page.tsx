@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { PlatformConfigManager } from "./platform-config-manager";
+import { connection } from "next/server";
 
 
 async function getPlatformConfigs() {
@@ -12,6 +13,7 @@ async function getPlatformConfigs() {
 }
 
 export default async function PlatformsPage() {
+  await connection();
   const configs = await getPlatformConfigs();
 
   return (

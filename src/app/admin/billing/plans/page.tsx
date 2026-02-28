@@ -8,6 +8,7 @@
 import { prismaAdmin } from "@/lib/prisma";
 import { formatPrice, getSupportedCurrencies, getYearlyDiscountPercent } from "@/lib/billing/currency";
 import { Suspense } from "react";
+import { connection } from "next/server";
 
 // Force dynamic rendering to avoid static prerendering issues
 
@@ -208,7 +209,11 @@ async function PlansContent({ params }: { params: PageProps['searchParams'] }) {
   );
 }
 
-export default async function BillingPlansPage({ searchParams }: PageProps) {
+export default async function BillingPlansPage({
+  searchParams,
+}: PageProps) {
+  await connection();
+  const { success, error } = await searchParams;
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">

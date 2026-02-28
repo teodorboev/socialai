@@ -1,6 +1,7 @@
 import { prismaAdmin } from "@/lib/prisma";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SafetyConfigManager } from "./safety-config-manager";
+import { connection } from "next/server";
 
 
 async function getSafetyConfigs() {
@@ -9,7 +10,8 @@ async function getSafetyConfigs() {
   });
 }
 
-export default async function SafetyPage() {
+export default async function SafetyConfigPage() {
+  await connection();
   const configs = await getSafetyConfigs();
 
   return (

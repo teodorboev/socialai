@@ -1,6 +1,7 @@
 import { prismaAdmin } from "@/lib/prisma";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CostDashboard } from "./cost-dashboard";
+import { connection } from "next/server";
 
 
 async function getCostData() {
@@ -108,6 +109,7 @@ async function getCostData() {
 }
 
 export default async function CostDashboardPage() {
+  await connection();
   const data = await getCostData();
 
   return (

@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { LLMModelManager } from "./llm-model-manager";
+import { connection } from "next/server";
 
 
 async function getLLMData() {
@@ -25,6 +26,7 @@ async function getLLMData() {
 }
 
 export default async function LLMModelsPage() {
+  await connection();
   const { providers, models, rules } = await getLLMData();
 
   return (

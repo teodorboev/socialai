@@ -1,5 +1,6 @@
 import { prismaAdmin } from "@/lib/prisma";
 import { EscalationRuleManager } from "./escalation-rule-manager";
+import { connection } from "next/server";
 
 
 async function getEscalationRules() {
@@ -9,7 +10,8 @@ async function getEscalationRules() {
   });
 }
 
-export default async function EscalationRulesPage() {
+export default async function EscalationPage() {
+  await connection();
   const rules = await getEscalationRules();
 
   return (
