@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { smartRouter, type SmartRouterRequest } from "@/lib/router";
+import { smartRouter, type SmartRouterRequest, registerTool } from "@/lib/router";
 import { z } from "zod";
-import { registerAllTools, getToolDefinitions } from "@/lib/chat/tool-loader";
+import { getToolDefinitions, registerAllTools } from "@/lib/chat/tool-loader";
+import * as chatTools from "@/lib/chat/tools";
 
 const ChatRequestSchema = z.object({
   message: z.string().min(1),
@@ -46,13 +47,27 @@ export async function POST(request: NextRequest) {
     const { message, conversationHistory } = ChatRequestSchema.parse(body);
 
     // Build system prompt with available tools
-    const systemPrompt = buildSystemPrompt();
+    const systemPrompt = buildSystemPrompt(orgId);
 
     // Get tool definitions and register them
-    const toolDefinitions = getToolDefinitions();
+    let toolDefinitions = getToolDefinitions();
     
-    // Register all tools (this only needs to happen once, but calling multiple times is safe)
-    registerAllTools();
+    // Wrap tools to auto-inject orgId
+    toolDefinitions = toolDefinitions.map((tool: any) => ({
+      ...tool,
+      inputSchema: {
+        ...tool.inputSchema,
+        properties: {
+          ...tool.inputSchema?.properties,
+          orgId: { type: "string", description: "Organization ID (already provided)" },
+        },
+        required: ["orgId", ...(tool.inputSchema?.required || [])],
+      },
+    }));
+
+    // Register tools with auto-injected orgId
+    // We need to re-register them with orgId bound
+    registerToolWrapper(orgId);
 
     // Build messages including history
     const messages = [
@@ -113,19 +128,32 @@ export async function POST(request: NextRequest) {
   }
 }
 
-function buildSystemPrompt(): string {
-  const toolsDescription = `
+function buildSystemPrompt(orgId: string): string {
+  return `
 You are SocialAI's AI Assistant. You help users manage their social media through conversation.
 
-You have access to the following tools:
+IMPORTANT: Always include orgId="${orgId}" in every tool call!
+
+## CRITICAL: You MUST use tools to get real data
+When a user asks about their account, metrics, content, schedule, competitors, etc:
+- Use get_metrics to fetch followers, engagement, reach
+- Use get_content_status to see content counts  
+- Use get_social_accounts to see connected platforms
+- Use get_scheduled_posts to see upcoming posts
+- Use get_escalations to check issues
+- Use get_posting_schedule to see when you post
+
+DO NOT make up data or say "I don't have access to that" - use the tools!
 
 ## QUERY TOOLS
 Use these to get information about the user's account:
 
 1. get_metrics(period) - Get followers, engagement rate, reach
    - period: "7d", "30d", or "90d"
+   - MUST include: orgId
 
 2. get_content_status() - Get counts of content by status
+   - MUST include: orgId
 
 3. get_escalations() - Get open escalations requiring attention
 
@@ -221,7 +249,40 @@ When making changes:
 
 Now, respond to the user's message. Use tools as needed to provide accurate information.
 `;
-  return toolsDescription;
+}
+
+function registerToolWrapper(orgId: string) {
+  // Register each tool with orgId auto-injected
+  registerTool("get_metrics", async (input: any) => {
+    return chatTools.getMetrics(orgId, input.period);
+  });
+  registerTool("get_content_status", async (input: any) => {
+    return chatTools.getContentStatus(orgId);
+  });
+  registerTool("get_escalations", async (input: any) => {
+    return chatTools.getEscalations(orgId);
+  });
+  registerTool("get_brand_config", async (input: any) => {
+    return chatTools.getBrandConfig(orgId);
+  });
+  registerTool("get_posting_schedule", async (input: any) => {
+    return chatTools.getPostingSchedule(orgId);
+  });
+  registerTool("get_competitors", async (input: any) => {
+    return chatTools.getCompetitors(orgId);
+  });
+  registerTool("get_social_accounts", async (input: any) => {
+    return chatTools.getSocialAccounts(orgId);
+  });
+  registerTool("get_recent_activity", async (input: any) => {
+    return chatTools.getRecentActivity(orgId, input.limit);
+  });
+  registerTool("get_goals", async (input: any) => {
+    return chatTools.getGoals(orgId);
+  });
+  registerTool("get_scheduled_posts", async (input: any) => {
+    return chatTools.getScheduledPosts(orgId, input.days);
+  });
 }
 
 function humanizeToolName(toolName: string): string {
