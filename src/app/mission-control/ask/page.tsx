@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Sparkles, Send, Loader2, ArrowLeft, Settings, Zap, Calendar, BarChart3, MessageCircle } from "lucide-react";
+import { Sparkles, Send, Loader2, ArrowLeft, Settings, Zap, Calendar, BarChart3, MessageCircle, TrendingUp, Users, Clock, Target, Palette, Shield, Plus } from "lucide-react";
 import Link from "next/link";
 import ReactMarkdown from "react-markdown";
 
@@ -17,6 +17,37 @@ interface ChatMessage {
   timestamp: Date;
   toolCalls?: { name: string; humanName: string }[];
 }
+
+const QUICK_ACTIONS = [
+  {
+    category: "Analytics",
+    actions: [
+      { label: "My metrics", prompt: "Show me my analytics for the last 30 days", icon: BarChart3 },
+      { label: "Performance", prompt: "What's performing best right now?", icon: TrendingUp },
+    ]
+  },
+  {
+    category: "Content",
+    actions: [
+      { label: "Create post", prompt: "Create a new post for Instagram", icon: Plus },
+      { label: "Scheduled", prompt: "What posts are scheduled?", icon: Calendar },
+    ]
+  },
+  {
+    category: "Settings",
+    actions: [
+      { label: "Schedule", prompt: "Show me my posting schedule", icon: Clock },
+      { label: "Brand voice", prompt: "Show my brand voice settings", icon: Palette },
+    ]
+  },
+  {
+    category: "Account",
+    actions: [
+      { label: "Escalations", prompt: "Show any escalations", icon: Shield },
+      { label: "Accounts", prompt: "Show my connected accounts", icon: Users },
+    ]
+  },
+];
 
 const SUGGESTED_PROMPTS = [
   "Post more Reels, they seem to be working",
@@ -217,21 +248,27 @@ export default function AskAIPage() {
           <div ref={messagesEndRef} />
         </CardContent>
 
-        {/* Suggested prompts */}
+        {/* Quick actions */}
         {messages.length <= 2 && (
           <div className="px-4 pb-2">
-            <p className="text-muted-foreground text-sm mb-2">Try asking:</p>
-            <div className="flex flex-wrap gap-2">
-              {SUGGESTED_PROMPTS.map((prompt, i) => (
-                <Button
-                  key={i}
-                  variant="outline"
-                  size="sm"
-                  className="border-input text-foreground/80 text-xs"
-                  onClick={() => handleSuggestedPrompt(prompt)}
-                >
-                  {prompt}
-                </Button>
+            <p className="text-muted-foreground text-sm mb-3">Quick actions:</p>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {QUICK_ACTIONS.map((category) => (
+                <div key={category.category} className="space-y-1">
+                  <p className="text-xs text-muted-foreground/60 px-1">{category.category}</p>
+                  {category.actions.map((action) => (
+                    <Button
+                      key={action.prompt}
+                      variant="ghost"
+                      size="sm"
+                      className="w-full justify-start text-left h-auto py-2 px-2 text-xs text-muted-foreground hover:text-foreground"
+                      onClick={() => handleSuggestedPrompt(action.prompt)}
+                    >
+                      <action.icon className="h-3 w-3 mr-2 shrink-0" />
+                      <span className="truncate">{action.label}</span>
+                    </Button>
+                  ))}
+                </div>
               ))}
             </div>
           </div>
@@ -257,27 +294,6 @@ export default function AskAIPage() {
             </Button>
           </div>
         </div>
-      </Card>
-
-      {/* Available tools hint */}
-      <Card className="mt-4 bg-card/30 border-border">
-        <CardContent className="py-3">
-          <p className="text-muted-foreground text-xs mb-2">I can help you with:</p>
-          <div className="flex flex-wrap gap-2">
-            <span className="text-xs text-muted-foreground/70 flex items-center gap-1">
-              <Calendar className="h-3 w-3" /> Scheduling
-            </span>
-            <span className="text-xs text-muted-foreground/70 flex items-center gap-1">
-              <BarChart3 className="h-3 w-3" /> Analytics
-            </span>
-            <span className="text-xs text-muted-foreground/70 flex items-center gap-1">
-              <Zap className="h-3 w-3" /> Content
-            </span>
-            <span className="text-xs text-muted-foreground/70 flex items-center gap-1">
-              <Settings className="h-3 w-3" /> Settings
-            </span>
-          </div>
-        </CardContent>
       </Card>
     </div>
   );
