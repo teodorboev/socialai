@@ -10,7 +10,6 @@ import { formatPrice, getSupportedCurrencies, getYearlyDiscountPercent } from "@
 import { Suspense } from "react";
 
 // Force dynamic rendering to avoid static prerendering issues
-export const dynamic = "force-dynamic";
 
 interface PageProps {
   searchParams: Promise<{ success?: string; error?: string }>;
@@ -49,7 +48,7 @@ async function getMRRByPlan() {
   });
 
   const mrrByPlan: Record<string, number> = {};
-  
+
   for (const sub of subscriptions) {
     const monthlyPrice = sub.billingPlan.stripePrices[0]?.unitAmount ?? 0;
     const planName = sub.billingPlan.name;
@@ -71,7 +70,7 @@ function PlansList() {
 
 function AlertMessages({ success, error }: { success?: string; error?: string }) {
   if (!success && !error) return null;
-  
+
   return (
     <>
       {success && (

@@ -4,7 +4,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { PlatformConfigManager } from "./platform-config-manager";
 
-export const dynamic = 'force-dynamic';
 
 async function getPlatformConfigs() {
   return prismaAdmin.platformConfig.findMany({

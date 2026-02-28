@@ -1,7 +1,6 @@
 import { prismaAdmin } from "@/lib/prisma";
 import { EmailTemplateManager } from "./email-template-manager";
 
-export const dynamic = 'force-dynamic';
 
 async function getEmailTemplates() {
   return prismaAdmin.emailTemplate.findMany({

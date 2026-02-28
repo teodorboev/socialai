@@ -1,16 +1,15 @@
 import { prismaAdmin } from "@/lib/prisma";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { 
-  Server, 
-  FileText, 
-  Flag, 
-  Shield, 
+import {
+  Server,
+  FileText,
+  Flag,
+  Shield,
   Mail,
   Users,
   Building2
 } from "lucide-react";
 
-export const dynamic = 'force-dynamic';
 
 async function getStats() {
   const [

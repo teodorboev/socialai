@@ -1,7 +1,6 @@
 import { prismaAdmin } from "@/lib/prisma";
 import { EscalationRuleManager } from "./escalation-rule-manager";
 
-export const dynamic = 'force-dynamic';
 
 async function getEscalationRules() {
   return prismaAdmin.escalationRule.findMany({

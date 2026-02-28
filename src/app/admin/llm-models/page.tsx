@@ -4,7 +4,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { LLMModelManager } from "./llm-model-manager";
 
-export const dynamic = 'force-dynamic';
 
 async function getLLMData() {
   const [providers, models, rules] = await Promise.all([
@@ -37,8 +36,8 @@ export default async function LLMModelsPage() {
         </p>
       </div>
 
-      <LLMModelManager 
-        initialProviders={providers} 
+      <LLMModelManager
+        initialProviders={providers}
         initialModels={models}
         initialRules={rules}
       />

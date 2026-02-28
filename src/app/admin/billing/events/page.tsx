@@ -3,7 +3,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
 // Force dynamic rendering
-export const dynamic = "force-dynamic";
 
 interface PageProps {
   searchParams: Promise<{ org?: string; type?: string }>;

@@ -2,12 +2,11 @@ import { prismaAdmin } from "@/lib/prisma";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CostDashboard } from "./cost-dashboard";
 
-export const dynamic = 'force-dynamic';
 
 async function getCostData() {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  
+
   const thirtyDaysAgo = new Date(today);
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 

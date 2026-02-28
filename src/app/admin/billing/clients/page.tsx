@@ -7,8 +7,6 @@
 import { prismaAdmin } from "@/lib/prisma";
 import { formatPrice, type SupportedCurrency } from "@/lib/billing/currency";
 
-// Force dynamic rendering
-export const dynamic = "force-dynamic";
 
 async function getBillingStats() {
   const [
@@ -190,15 +188,14 @@ export default async function BillingClientsPage() {
                   <td className="p-3">{sub.billingPlan?.name ?? "Unknown"}</td>
                   <td className="p-3">
                     <span
-                      className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${
-                        sub.status === "active"
+                      className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${sub.status === "active"
                           ? "bg-green-100 text-green-800"
                           : sub.status === "trialing"
-                          ? "bg-blue-100 text-blue-800"
-                          : sub.status === "past_due"
-                          ? "bg-yellow-100 text-yellow-800"
-                          : "bg-gray-100 text-gray-800"
-                      }`}
+                            ? "bg-blue-100 text-blue-800"
+                            : sub.status === "past_due"
+                              ? "bg-yellow-100 text-yellow-800"
+                              : "bg-gray-100 text-gray-800"
+                        }`}
                     >
                       {sub.status}
                     </span>
@@ -211,8 +208,8 @@ export default async function BillingClientsPage() {
                         marginPercent > 70
                           ? "text-green-600"
                           : marginPercent > 30
-                          ? "text-yellow-600"
-                          : "text-red-600"
+                            ? "text-yellow-600"
+                            : "text-red-600"
                       }
                     >
                       ${(margin / 100).toFixed(2)} ({marginPercent.toFixed(0)}%)
