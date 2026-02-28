@@ -19,6 +19,7 @@ import {
   DollarSign,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Suspense } from "react";
 
 const navigation = [
   { name: "Overview", href: "/admin", icon: LayoutDashboard },
@@ -63,7 +64,7 @@ export default function AdminLayout({
         <div className="flex flex-1 flex-col overflow-y-auto bg-white border-r">
           <nav className="flex flex-1 flex-col gap-1 p-4">
             {navigation.map((item) => {
-              const isActive = pathname === item.href || 
+              const isActive = pathname === item.href ||
                 (item.href !== "/admin" && pathname.startsWith(item.href));
               return (
                 <Link
@@ -89,7 +90,7 @@ export default function AdminLayout({
               </div>
             </div>
             {billingNav.map((item) => {
-              const isActive = pathname === item.href || 
+              const isActive = pathname === item.href ||
                 (item.href !== "/admin" && pathname.startsWith(item.href));
               return (
                 <Link
@@ -141,7 +142,7 @@ export default function AdminLayout({
               </div>
             </div>
             {systemNav.map((item) => {
-              const isActive = pathname === item.href || 
+              const isActive = pathname === item.href ||
                 (item.href !== "/admin" && pathname.startsWith(item.href));
               return (
                 <Link
@@ -165,7 +166,15 @@ export default function AdminLayout({
 
       {/* Main content */}
       <div className="lg:pl-64">
-        <main className="py-8 px-4 sm:px-6 lg:px-8">{children}</main>
+        <main className="py-8 px-4 sm:px-6 lg:px-8">
+          <Suspense fallback={<div className="animate-pulse space-y-4">
+            <div className="h-8 w-1/3 bg-gray-200 rounded"></div>
+            <div className="h-32 bg-gray-100 rounded"></div>
+            <div className="h-64 bg-gray-50 rounded"></div>
+          </div>}>
+            {children}
+          </Suspense>
+        </main>
       </div>
     </div>
   );
