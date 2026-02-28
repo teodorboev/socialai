@@ -46,59 +46,43 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { message, conversationHistory } = ChatRequestSchema.parse(body);
 
-    // Build system prompt with available tools
-    const systemPrompt = buildSystemPrompt(orgId);
-
-    // Get tool definitions - don't modify them, orgId is injected via registerToolWrapper
-    let toolDefinitions = getToolDefinitions();
+    // Auto-detect and execute tools based on message content - no LLM tool calling needed
+    const toolResult = await detectAndExecuteTool(orgId, message);
     
-    // The wrapper already injects orgId, so remove orgId from required
-    toolDefinitions = toolDefinitions.map((tool: any) => ({
-      ...tool,
-      inputSchema: {
-        ...tool.inputSchema,
-        required: tool.inputSchema?.required?.filter((r: string) => r !== "orgId") || [],
-      },
-    }));
+    // Build enhanced system prompt with tool results included
+    let contextInfo = "";
+    if (toolResult) {
+      contextInfo = `\n\nHere are the results from my internal checks:\n${formatToolResultForLLM(toolResult)}\n\nUse this real data to answer the user's question.`;
+    }
 
-    // Register tools with auto-injected orgId
-    registerToolWrapper(orgId);
+    const systemPrompt = buildSystemPrompt(orgId, contextInfo);
 
     // Build messages including history
+    const userMessage = contextInfo 
+      ? `${message}\n\n${contextInfo}` 
+      : message;
+    
     const messages = [
       ...conversationHistory.map((msg: any) => ({
         role: msg.role as "user" | "assistant",
         content: msg.content,
       })),
-      { role: "user" as const, content: message },
+      { role: "user" as const, content: userMessage },
     ];
 
-    // Call smart-router with tools
+    // Call smart-router WITHOUT tools - we handle tool execution internally
     const routerRequest: SmartRouterRequest = {
       agentName: "CHAT_ASSISTANT",
       messages,
       systemPrompt,
       maxTokens: 2000,
       organizationId: orgId,
-      tools: toolDefinitions,
-      maxToolIterations: 5,
     };
 
     const response = await smartRouter.complete(routerRequest);
 
-    // Parse the response - the AI should indicate if it used any tools
-    const aiResponse = response.content;
-
-    // Humanize tool names for display
-    const toolCalls = response.toolCalls?.map((tc: any) => ({
-      name: tc.name,
-      input: tc.input,
-      humanName: humanizeToolName(tc.name),
-    })) || [];
-
     return NextResponse.json({
-      response: aiResponse,
-      toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
+      response: response.content,
       usage: {
         inputTokens: response.usage.inputTokens,
         outputTokens: response.usage.outputTokens,
@@ -123,40 +107,139 @@ export async function POST(request: NextRequest) {
   }
 }
 
-function buildSystemPrompt(orgId: string): string {
-  const toolExample = 'Use tool by responding with JSON: {"type":"tool_use","name":"get_social_accounts","input":{"orgId":"' + orgId + '"}}';
+// Auto-detect what user is asking for and execute the appropriate tool
+async function detectAndExecuteTool(orgId: string, message: string): Promise<{ tool: string; data: any } | null> {
+  const lower = message.toLowerCase();
   
+  // Connected accounts
+  if (lower.includes("connected account") || lower.includes("social account") || lower.includes("what platforms") || lower.includes("which accounts")) {
+    const data = await chatTools.getSocialAccounts(orgId);
+    return { tool: "get_social_accounts", data };
+  }
+  
+  // Metrics / analytics
+  if (lower.includes("metric") || lower.includes("analytics") || lower.includes("follower") || lower.includes("engagement") || lower.includes("reach")) {
+    const period = lower.includes("30 day") || lower.includes("30d") || lower.includes("month") ? "30d" : 
+                  lower.includes("90 day") || lower.includes("90d") ? "90d" : "7d";
+    const data = await chatTools.getMetrics(orgId, period);
+    return { tool: "get_metrics", data };
+  }
+  
+  // Content status
+  if (lower.includes("content") && (lower.includes("status") || lower.includes("count") || lower.includes("how many"))) {
+    const data = await chatTools.getContentStatus(orgId);
+    return { tool: "get_content_status", data };
+  }
+  
+  // Scheduled posts
+  if (lower.includes("scheduled") || lower.includes("upcoming") || lower.includes("planned")) {
+    const days = lower.includes("week") ? 7 : lower.includes("month") ? 30 : 14;
+    const data = await chatTools.getScheduledPosts(orgId, days);
+    return { tool: "get_scheduled_posts", data };
+  }
+  
+  // Posting schedule
+  if (lower.includes("posting schedule") || lower.includes("when do you post") || lower.includes("schedule")) {
+    const data = await chatTools.getPostingSchedule(orgId);
+    return { tool: "get_posting_schedule", data };
+  }
+  
+  // Escalations
+  if (lower.includes("escalat") || lower.includes("issue") || lower.includes("problem") || lower.includes("attention")) {
+    const data = await chatTools.getEscalations(orgId);
+    return { tool: "get_escalations", data };
+  }
+  
+  // Brand config
+  if (lower.includes("brand") && (lower.includes("setting") || lower.includes("voice") || lower.includes("config"))) {
+    const data = await chatTools.getBrandConfig(orgId);
+    return { tool: "get_brand_config", data };
+  }
+  
+  // Goals
+  if (lower.includes("goal")) {
+    const data = await chatTools.getGoals(orgId);
+    return { tool: "get_goals", data };
+  }
+  
+  // Competitors
+  if (lower.includes("competitor")) {
+    const data = await chatTools.getCompetitors(orgId);
+    return { tool: "get_competitors", data };
+  }
+  
+  // Recent activity
+  if (lower.includes("activity") || lower.includes("recent")) {
+    const data = await chatTools.getRecentActivity(orgId, 10);
+    return { tool: "get_recent_activity", data };
+  }
+  
+  return null;
+}
+
+// Format tool results for LLM context
+function formatToolResultForLLM(result: { tool: string; data: any }): string {
+  const { tool, data } = result;
+  
+  if (tool === "get_social_accounts") {
+    if (!data || data.length === 0) return "No social accounts connected yet.";
+    return `Connected accounts: ${data.map((a: any) => `${a.platform}${a.platformUsername ? ` (@${a.platformUsername})` : ''}`).join(', ')}`;
+  }
+  
+  if (tool === "get_metrics") {
+    return `Metrics: ${data.followers?.toLocaleString() || 0} followers, ${data.engagementRate?.toFixed(1) || 0}% engagement, ${data.reach?.toLocaleString() || 0} reach`;
+  }
+  
+  if (tool === "get_content_status") {
+    return `Content: ${data.published || 0} published, ${data.scheduled || 0} scheduled, ${data.pendingReview || 0} pending review, ${data.draft || 0} drafts`;
+  }
+  
+  if (tool === "get_scheduled_posts") {
+    if (!data || data.length === 0) return "No posts scheduled.";
+    return `Scheduled posts: ${data.length} posts coming up`;
+  }
+  
+  if (tool === "get_posting_schedule") {
+    if (!data || data.length === 0) return "No posting schedule configured.";
+    return `Schedule: ${JSON.stringify(data)}`;
+  }
+  
+  if (tool === "get_escalations") {
+    if (!data || data.length === 0) return "No escalations - all good!";
+    return `Escalations: ${data.length} items need attention`;
+  }
+  
+  if (tool === "get_brand_config") {
+    return `Brand: ${JSON.stringify(data).slice(0, 200)}`;
+  }
+  
+  if (tool === "get_goals") {
+    if (!data || data.length === 0) return "No goals set yet.";
+    return `Goals: ${data.join(', ')}`;
+  }
+  
+  if (tool === "get_competitors") {
+    if (!data || data.length === 0) return "No competitors tracked.";
+    return `Competitors: ${data.map((c: any) => c.name).join(', ')}`;
+  }
+  
+  if (tool === "get_recent_activity") {
+    if (!data || data.length === 0) return "No recent activity.";
+    return `Recent activity: ${data.length} actions`;
+  }
+  
+  return JSON.stringify(data).slice(0, 500);
+}
+
+function buildSystemPrompt(orgId: string, contextInfo: string = ""): string {
   return `
-You are SocialAI's AI Assistant. You help users manage their social media through conversation.
+You are SocialAI's friendly AI assistant. Help users with their social media.
 
-The orgId for all operations is: ${orgId}
+${contextInfo}
 
-## TOOL CALLING INSTRUCTIONS - VERY IMPORTANT
-You must use the provided tools to get data. When you need information, respond with a JSON tool_use message.
-
-Example format:
-${toolExample}
-
-DO NOT write Python code. DO NOT use print(). Use the JSON tool_use format!
-
-## TOOLS AVAILABLE
-- get_metrics (period: "7d", "30d", "90d")  
-- get_content_status
-- get_escalations
-- get_brand_config
-- get_posting_schedule
-- get_competitors
-- get_social_accounts
-- get_recent_activity
-- get_goals
-- get_scheduled_posts
-
-## RESPONSE FORMAT
-After calling a tool, summarize the results for the user in plain English with emojis:
-- "📊 You have 3 connected accounts: Instagram, Facebook, and LinkedIn"
-- "📈 Your metrics show 12,450 followers with 3.2% engagement"
-
-DO NOT show raw JSON to users. Format numbers nicely (12.5K, not 12500).
+Be conversational, helpful, and concise. Use emojis to make responses friendly.
+Format numbers nicely: use commas (12,450) or K (12.5K) instead of raw numbers.
+Never show raw JSON to users - always summarize in plain English.
 `;
 }
 
