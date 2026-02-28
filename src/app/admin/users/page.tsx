@@ -130,7 +130,10 @@ export default function AdminUsersPage() {
         setTotalCount(data.pagination.totalCount);
       } else {
         const errData = await res.json().catch(() => ({}));
-        setError(errData.error || `Failed to fetch users (${res.status})`);
+        // Show both error message and details if available
+        const errorMsg = errData.error || `Failed to fetch users (${res.status})`;
+        const details = errData.details ? ` - ${errData.details}` : "";
+        setError(errorMsg + details);
       }
     } catch (error) {
       console.error("Error fetching users:", error);

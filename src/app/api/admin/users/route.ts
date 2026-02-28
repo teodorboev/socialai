@@ -39,89 +39,121 @@ export async function GET(request: Request) {
       orgMemberWhere.organizationId = params.organizationId;
     }
 
-    // If filtering by subscription status, we need to include org in count
-    // This requires a different approach - we'll count after fetching
-    // For now, we'll get all org members and filter in memory, then count
-    
-    // Get all matching org members first (without pagination for accurate count)
-    const allMatchingMembers = await prismaAdmin.orgMember.findMany({
+    // SIMPLIFIED APPROACH: Get total count first
+    let totalCount = await prismaAdmin.orgMember.count({
       where: orgMemberWhere,
-      select: {
-        id: true,
-        organization: {
-          select: {
-            subscription: {
-              select: {
-                status: true,
-              },
-            },
-          },
-        },
-      },
     });
 
-    // Filter by subscription status
-    let filteredByStatus = allMatchingMembers;
-    if (params.status) {
-      filteredByStatus = allMatchingMembers.filter(
-        (m) => m.organization?.subscription?.status === params.status
-      );
-    }
-
-    // Get total count after filtering
-    const totalCount = filteredByStatus.length;
+    // If filtering by subscription status, we need to fetch and filter in memory
+    // But only if we have users and status filter is active
+    let filteredIds: string[] | null = null;
     
-    // Get IDs of filtered members for pagination
-    const filteredIds = filteredByStatus.map(m => m.id);
-
-    // Early return if no users match the filter criteria
-    if (filteredIds.length === 0) {
-      return NextResponse.json({
-        users: [],
-        pagination: { page, limit, totalCount: 0, totalPages: 0 },
-      });
-    }
-
-    // Get org members with organization and subscription details
-    // Only fetch the ones that match our filters
-    const orgMembers = await prismaAdmin.orgMember.findMany({
-      where: {
-        ...orgMemberWhere,
-        id: { in: filteredIds },
-      },
-      select: {
-        id: true,
-        userId: true,
-        organizationId: true,
-        role: true,
-        createdAt: true,
-        organization: {
+    if (params.status && totalCount > 0) {
+      try {
+        // Try to get subscription status for filtering
+        const allWithStatus = await prismaAdmin.orgMember.findMany({
+          where: orgMemberWhere,
           select: {
             id: true,
-            name: true,
-            slug: true,
-            subscription: {
+            organization: {
               select: {
-                id: true,
-                status: true,
-                currentPeriodStart: true,
-                currentPeriodEnd: true,
-                billingPlan: {
+                subscription: {
                   select: {
-                    id: true,
-                    name: true,
-                    slug: true,
+                    status: true,
                   },
                 },
               },
             },
           },
+          take: 1000, // Limit for performance
+        });
+        
+        const filtered = allWithStatus.filter(
+          (m) => m.organization?.subscription?.status === params.status
+        );
+        filteredIds = filtered.map(m => m.id);
+        totalCount = filteredIds.length;
+      } catch (subError) {
+        console.error("Error fetching subscription status, ignoring filter:", subError);
+        // If subscription query fails, ignore the status filter
+        filteredIds = null;
+      }
+    }
+
+    // Build the query
+    const queryWhere = filteredIds 
+      ? { ...orgMemberWhere, id: { in: filteredIds } }
+      : orgMemberWhere;
+
+    // Get org members with organization details
+    // Use try-catch for each part to make it resilient
+    let orgMembers;
+    try {
+      orgMembers = await prismaAdmin.orgMember.findMany({
+        where: queryWhere,
+        select: {
+          id: true,
+          userId: true,
+          organizationId: true,
+          role: true,
+          createdAt: true,
+          organization: {
+            select: {
+              id: true,
+              name: true,
+              slug: true,
+            },
+          },
         },
-      },
-      skip,
-      take: limit,
-      orderBy: { createdAt: "desc" },
-    });
+        skip,
+        take: limit,
+        orderBy: { createdAt: "desc" },
+      });
+    } catch (queryError) {
+      console.error("Error fetching org members:", queryError);
+      return NextResponse.json({ 
+        error: "Failed to fetch users from database",
+        details: queryError instanceof Error ? queryError.message : "Unknown error"
+      }, { status: 500 });
+    }
+
+    // Now try to get subscription info separately (if it exists)
+    let usersWithSubscription = orgMembers;
+    try {
+      // Get subscription info for each user
+      const orgIds = [...new Set(orgMembers.map(m => m.organizationId))];
+      
+      if (orgIds.length > 0) {
+        const subscriptions = await prismaAdmin.subscription.findMany({
+          where: { organizationId: { in: orgIds } },
+          select: {
+            id: true,
+            status: true,
+            organizationId: true,
+            billingPlan: {
+              select: {
+                id: true,
+                name: true,
+                slug: true,
+              },
+            },
+          },
+        });
+        
+        const subMap = new Map(subscriptions.map(s => [s.organizationId, s]));
+        
+        usersWithSubscription = orgMembers.map(m => ({
+          ...m,
+          organization: {
+            ...m.organization,
+            subscription: subMap.get(m.organizationId) || null,
+          },
+        }));
+      }
+    } catch (subError) {
+      console.error("Error fetching subscriptions:", subError);
+      // Continue without subscription info
+    }
 
     // For user details, we need to fetch from Supabase Auth
     // Since we can't directly query auth.users easily, we'll return org member data
@@ -130,7 +162,7 @@ export async function GET(request: Request) {
 
     // If we have search params, we need to filter in memory (since we don't have email in org_members)
     // For now, search is not implemented - would need Supabase Auth query
-    let filteredMembers = orgMembers;
+    let filteredMembers = usersWithSubscription;
     
     if (params.search) {
       // We can't filter by email directly without Supabase Auth query
@@ -150,7 +182,13 @@ export async function GET(request: Request) {
     });
   } catch (error) {
     console.error("Error fetching users:", error);
-    return NextResponse.json({ error: "Failed to fetch users" }, { status: 500 });
+    // Return more detailed error for debugging
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    return NextResponse.json({ 
+      error: "Failed to fetch users",
+      details: errorMessage,
+      stack: process.env.NODE_ENV === "development" ? (error as Error)?.stack : undefined
+    }, { status: 500 });
   }
 }
 
