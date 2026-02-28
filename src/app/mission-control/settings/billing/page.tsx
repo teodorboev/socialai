@@ -11,6 +11,7 @@ import { formatPrice } from "@/lib/billing/currency";
 import { getAvailablePlans } from "@/lib/billing/entitlements";
 import { createCheckoutSession, createPortalSession } from "@/lib/billing/stripe";
 import { redirect } from "next/navigation";
+import { connection } from "next/server";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -59,7 +60,7 @@ async function getPlatformCount(organizationId: string) {
 async function getOrganizationId(): Promise<string | null> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  
+
   if (!user) return null;
 
   const { data: orgMember } = await supabase
@@ -72,11 +73,14 @@ async function getOrganizationId(): Promise<string | null> {
 }
 
 export default async function BillingPage({ searchParams }: PageProps) {
+  // Explicitly opt into dynamic rendering for production PPR
+  await connection();
+
   const params = await searchParams;
-  
+
   // Get organization from authenticated user
   const organizationId = await getOrganizationId();
-  
+
   if (!organizationId) {
     redirect("/login");
   }
@@ -94,7 +98,7 @@ export default async function BillingPage({ searchParams }: PageProps) {
 
   async function handleCreateCheckout(formData: FormData) {
     "use server";
-    
+
     const priceId = formData.get("priceId") as string;
     if (!priceId) return;
 
@@ -108,7 +112,7 @@ export default async function BillingPage({ searchParams }: PageProps) {
     });
 
     let customerId: string;
-    
+
     if (!org?.stripeCustomerId) {
       // Create customer if doesn't exist
       const supabase = await createClient();
@@ -133,7 +137,7 @@ export default async function BillingPage({ searchParams }: PageProps) {
     }
 
     const baseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "http://localhost:3000";
-    
+
     const session = await createCheckoutSession({
       stripeCustomerId: customerId,
       stripePriceId: priceId,
@@ -150,7 +154,7 @@ export default async function BillingPage({ searchParams }: PageProps) {
 
   async function handleOpenPortal() {
     "use server";
-    
+
     const orgId = await getOrganizationId();
     if (!orgId) return;
 
@@ -164,7 +168,7 @@ export default async function BillingPage({ searchParams }: PageProps) {
     }
 
     const baseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "http://localhost:3000";
-    
+
     const session = await createPortalSession({
       stripeCustomerId: org.stripeCustomerId,
       returnUrl: `${baseUrl}/mission-control/settings/billing`,
@@ -265,15 +269,15 @@ export default async function BillingPage({ searchParams }: PageProps) {
                 <div className="text-muted-foreground">
                   {subscription.billingPlan.stripePrices.find(p => p.interval === "month")
                     ? formatPrice(
-                        subscription.billingPlan.stripePrices.find(p => p.interval === "month")!.unitAmount,
-                        subscription.currency as any
-                      )
+                      subscription.billingPlan.stripePrices.find(p => p.interval === "month")!.unitAmount,
+                      subscription.currency as any
+                    )
                     : "—"
                   }
                   /month
                 </div>
               </div>
-              
+
               <div className="space-y-2">
                 {subscription.cancelAtPeriodEnd && (
                   <p className="text-sm text-red-600">
@@ -297,16 +301,16 @@ export default async function BillingPage({ searchParams }: PageProps) {
                 <div className="p-4 bg-muted rounded-lg">
                   <div className="text-2xl font-bold">{postsThisMonth}</div>
                   <div className="text-sm text-muted-foreground">
-                    / {subscription.billingPlan.maxPostsPerMonth === -1 
-                      ? "∞" 
+                    / {subscription.billingPlan.maxPostsPerMonth === -1
+                      ? "∞"
                       : subscription.billingPlan.maxPostsPerMonth} posts
                   </div>
                 </div>
                 <div className="p-4 bg-muted rounded-lg">
                   <div className="text-2xl font-bold">{platformsConnected}</div>
                   <div className="text-sm text-muted-foreground">
-                    / {subscription.billingPlan.maxPlatforms === -1 
-                      ? "∞" 
+                    / {subscription.billingPlan.maxPlatforms === -1
+                      ? "∞"
                       : subscription.billingPlan.maxPlatforms} platforms
                   </div>
                 </div>
@@ -354,7 +358,7 @@ export default async function BillingPage({ searchParams }: PageProps) {
                 .filter((plan) => plan.id !== subscription?.billingPlanId)
                 .map((plan) => {
                   const monthlyPrice = (plan.prices as any)?.usd?.month;
-                  
+
                   return (
                     <div key={plan.id} className="border rounded-lg p-4">
                       <h3 className="font-semibold">{plan.name}</h3>
@@ -364,7 +368,7 @@ export default async function BillingPage({ searchParams }: PageProps) {
                           : "—"}
                         {monthlyPrice && <span className="text-sm font-normal">/mo</span>}
                       </div>
-                      
+
                       <ul className="mt-4 space-y-1 text-sm text-muted-foreground">
                         <li>{plan.maxPlatforms === -1 ? "∞" : plan.maxPlatforms} platforms</li>
                         <li>{plan.maxPostsPerMonth === -1 ? "∞" : plan.maxPostsPerMonth} posts/mo</li>
