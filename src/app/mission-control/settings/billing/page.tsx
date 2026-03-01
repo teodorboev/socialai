@@ -357,7 +357,7 @@ export default async function BillingPage({ searchParams }: PageProps) {
               {availablePlans
                 .filter((plan) => plan.id !== subscription?.billingPlanId)
                 .map((plan) => {
-                  const monthlyPrice = (plan.prices as any)?.usd?.month;
+                  const monthlyPrice = plan.prices.find((p: any) => p.interval === "month");
 
                   return (
                     <div key={plan.id} className="border rounded-lg p-4">
