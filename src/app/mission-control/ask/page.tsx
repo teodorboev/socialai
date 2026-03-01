@@ -1,5 +1,6 @@
 "use client";
 
+import posthog from "posthog-js";
 import { createClient } from "@/lib/supabase/client";
 import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -107,6 +108,10 @@ export default function AskAIPage() {
     };
 
     setMessages(prev => [...prev, userMessage]);
+    posthog.capture("ai_chat_message_sent", {
+      message_length: input.trim().length,
+      conversation_turn: messages.length,
+    });
     setInput("");
     setLoading(true);
 
@@ -149,7 +154,8 @@ export default function AskAIPage() {
       setMessages(prev => [...prev, aiMessage]);
     } catch (error) {
       console.error("Chat error:", error);
-      
+      posthog.captureException(error, { tags: { context: "ai_chat" } });
+
       const errorMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
         role: "ai",

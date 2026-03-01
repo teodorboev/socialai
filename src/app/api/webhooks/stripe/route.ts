@@ -11,6 +11,7 @@ import { NextResponse } from "next/server";
 import { getStripe } from "@/lib/billing/stripe";
 import { prisma } from "@/lib/prisma";
 import { inngest } from "@/inngest/client";
+import { getPostHogClient } from "@/lib/posthog-server";
 
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!;
 
@@ -209,12 +210,26 @@ async function handleSubscriptionCreated(sub: any) {
 
   await inngest.send({
     name: "billing/subscription-activated",
-    data: { 
-      organizationId, 
+    data: {
+      organizationId,
       planSlug: planPrice.billingPlan.slug,
       status: sub.status,
     },
   });
+
+  const posthog = getPostHogClient();
+  posthog.capture({
+    distinctId: organizationId,
+    event: "subscription_activated",
+    properties: {
+      organization_id: organizationId,
+      plan_name: planPrice.billingPlan.name,
+      plan_slug: planPrice.billingPlan.slug,
+      status: sub.status,
+      stripe_subscription_id: sub.id,
+    },
+  });
+  await posthog.shutdown();
 
   console.log(`Subscription created for org ${organizationId}: ${planPrice.billingPlan.name}`);
 }
@@ -300,11 +315,23 @@ async function handleSubscriptionCanceled(sub: any) {
 
   await inngest.send({
     name: "billing/subscription-canceled",
-    data: { 
+    data: {
       organizationId,
       reason: sub.metadata?.cancellation_reason,
     },
   });
+
+  const posthogCancel = getPostHogClient();
+  posthogCancel.capture({
+    distinctId: organizationId,
+    event: "subscription_canceled",
+    properties: {
+      organization_id: organizationId,
+      cancellation_reason: sub.metadata?.cancellation_reason ?? null,
+      stripe_subscription_id: sub.id,
+    },
+  });
+  await posthogCancel.shutdown();
 
   console.log(`Subscription canceled for org ${organizationId}`);
 }
@@ -407,6 +434,19 @@ async function handlePaymentFailed(invoice: any) {
       dunningStep,
     },
   });
+
+  const posthogPayment = getPostHogClient();
+  posthogPayment.capture({
+    distinctId: subscription.organizationId,
+    event: "payment_failed",
+    properties: {
+      organization_id: subscription.organizationId,
+      fail_count: newFailCount,
+      dunning_step: dunningStep,
+      stripe_customer_id: customerId,
+    },
+  });
+  await posthogPayment.shutdown();
 
   console.log(`Payment failed for org ${subscription.organizationId}: attempt ${newFailCount}`);
 }

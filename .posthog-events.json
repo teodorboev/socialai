@@ -1,0 +1,67 @@
+[
+  {
+    "event": "user_signed_up",
+    "description": "User completes account creation (email + password step). Top of the conversion funnel.",
+    "file": "src/app/(auth)/signup/page.tsx"
+  },
+  {
+    "event": "plan_selected",
+    "description": "User clicks to start checkout for a specific plan. Captures plan name, slug, currency, and price. Critical conversion event.",
+    "file": "src/app/(auth)/signup/page.tsx"
+  },
+  {
+    "event": "magic_link_requested",
+    "description": "User requests a magic link login. Indicates passwordless auth preference.",
+    "file": "src/app/(auth)/login/page.tsx"
+  },
+  {
+    "event": "user_logged_in",
+    "description": "User successfully signs in with password. Used for user identification.",
+    "file": "src/app/(auth)/login/page.tsx"
+  },
+  {
+    "event": "onboarding_completed",
+    "description": "User finishes the onboarding conversation flow and brand config is saved. Includes company name, industry, autonomy level, and platforms selected.",
+    "file": "src/app/(onboarding)/onboard/page.tsx"
+  },
+  {
+    "event": "ai_chat_message_sent",
+    "description": "User sends a message in the Ask AI interface. Captures whether a quick action or free-form text was used.",
+    "file": "src/app/mission-control/ask/page.tsx"
+  },
+  {
+    "event": "social_account_connect_clicked",
+    "description": "User initiates OAuth connection flow for a social platform. Captures platform name.",
+    "file": "src/app/mission-control/accounts/page.tsx"
+  },
+  {
+    "event": "social_account_disconnected",
+    "description": "User disconnects a social account. Captures platform name.",
+    "file": "src/app/mission-control/accounts/page.tsx"
+  },
+  {
+    "event": "content_generated",
+    "description": "Server-side: AI content generation API call completes. Captures platform, confidence score, and whether human review is required.",
+    "file": "src/app/api/agents/generate-content/route.ts"
+  },
+  {
+    "event": "checkout_session_created",
+    "description": "Server-side: Stripe checkout session created successfully during onboarding. Captures plan ID and currency.",
+    "file": "src/app/api/billing/onboarding/route.ts"
+  },
+  {
+    "event": "subscription_activated",
+    "description": "Server-side: Stripe webhook confirms subscription created/activated. Captures org ID and plan name.",
+    "file": "src/app/api/webhooks/stripe/route.ts"
+  },
+  {
+    "event": "payment_failed",
+    "description": "Server-side: Stripe webhook reports a failed payment. Captures fail count and dunning step.",
+    "file": "src/app/api/webhooks/stripe/route.ts"
+  },
+  {
+    "event": "subscription_canceled",
+    "description": "Server-side: Subscription is canceled via Stripe webhook. Key churn event.",
+    "file": "src/app/api/webhooks/stripe/route.ts"
+  }
+]

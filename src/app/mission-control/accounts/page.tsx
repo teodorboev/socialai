@@ -1,5 +1,6 @@
 "use client";
 
+import posthog from "posthog-js";
 import { createClient } from "@/lib/supabase/client";
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -105,20 +106,22 @@ export default function AccountsPage() {
     }
 
     if (oauthUrl) {
+      posthog.capture("social_account_connect_clicked", { platform });
       window.location.href = oauthUrl;
     } else {
       setConnecting(null);
     }
   }
 
-  async function disconnectAccount(accountId: string) {
+  async function disconnectAccount(accountId: string, platform?: string) {
     const supabase = await createClient();
-    
+
     await supabase
       .from("social_accounts")
       .update({ isActive: false })
       .eq("id", accountId);
 
+    posthog.capture("social_account_disconnected", { platform: platform ?? "unknown", account_id: accountId });
     loadAccounts();
   }
 
@@ -200,7 +203,7 @@ export default function AccountsPage() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => disconnectAccount(account.id)}
+                    onClick={() => disconnectAccount(account.id, account.platform)}
                     className="text-destructive"
                   >
                     <Trash2 className="h-4 w-4" />

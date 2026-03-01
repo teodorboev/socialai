@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { ContentCreatorAgent } from "@/agents/content-creator";
+import { getPostHogClient } from "@/lib/posthog-server";
 
 export async function POST(request: NextRequest) {
   try {
@@ -96,6 +97,21 @@ export async function POST(request: NextRequest) {
     if (saveError) {
       return NextResponse.json({ error: saveError.message }, { status: 500 });
     }
+
+    const posthog = getPostHogClient();
+    posthog.capture({
+      distinctId: user.id,
+      event: "content_generated",
+      properties: {
+        platform,
+        content_type: (result.data as any)?.contentType,
+        confidence_score: result.confidenceScore,
+        needs_review: result.confidenceScore < 0.75,
+        status: savedContent?.status,
+        organization_id: organizationId,
+      },
+    });
+    await posthog.shutdown();
 
     return NextResponse.json({
       success: true,

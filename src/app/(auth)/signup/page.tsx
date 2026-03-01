@@ -11,6 +11,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import posthog from "posthog-js";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -67,7 +68,7 @@ export default function SignupWithPricingPage() {
     setLoading(true);
     setError(null);
 
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -78,8 +79,15 @@ export default function SignupWithPricingPage() {
 
     if (error) {
       setError(error.message);
+      posthog.captureException(error, { level: "info", tags: { context: "signup" } });
       setLoading(false);
     } else {
+      // Identify the new user in PostHog right away
+      const userId = data.user?.id;
+      if (userId) {
+        posthog.identify(userId, { email, name: fullName });
+      }
+      posthog.capture("user_signed_up", { email, name: fullName });
       // Move to pricing step
       setStep("pricing");
       setLoading(false);
@@ -149,12 +157,23 @@ export default function SignupWithPricingPage() {
       const data = await res.json();
 
       if (data.url) {
+        const priceAmount = plan.prices[currency]?.month?.amount;
+        posthog.capture("plan_selected", {
+          plan_id: plan.id,
+          plan_name: plan.name,
+          plan_slug: plan.slug,
+          currency,
+          price_amount: priceAmount,
+          trial_days: plan.trialDays,
+          agent_tier: plan.agentTier,
+        });
         window.location.href = data.url;
       } else {
         throw new Error(data.error || "Failed to create checkout");
       }
     } catch (error: any) {
       console.error("Checkout error:", error);
+      posthog.captureException(error, { tags: { context: "plan_selection" } });
       toast.error(error.message || "Failed to start checkout");
     } finally {
       setLoading(false);

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import posthog from "posthog-js";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,15 +23,22 @@ export default function LoginPage() {
     setLoading(true);
     setError(null);
 
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
 
     if (error) {
       setError(error.message);
+      posthog.captureException(error, { level: "info", tags: { context: "login" } });
       setLoading(false);
     } else {
+      // Identify the user in PostHog using their Supabase user ID
+      const userId = data.user?.id;
+      if (userId) {
+        posthog.identify(userId, { email: data.user?.email });
+      }
+      posthog.capture("user_logged_in", { method: "password" });
       router.push("/");
     }
   };
@@ -48,7 +56,9 @@ export default function LoginPage() {
 
     if (error) {
       setError(error.message);
+      posthog.captureException(error, { level: "info", tags: { context: "magic_link" } });
     } else {
+      posthog.capture("magic_link_requested", { email });
       setError("Check your email for the magic link!");
     }
     setLoading(false);

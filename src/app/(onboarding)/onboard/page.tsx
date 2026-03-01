@@ -1,5 +1,6 @@
 "use client";
 
+import posthog from "posthog-js";
 import { createClient } from "@/lib/supabase/client";
 import { redirect } from "next/navigation";
 import { useState, useEffect, useRef } from "react";
@@ -328,6 +329,15 @@ export default function OnboardPage() {
           auto_engagement_enabled: data.autonomyLevel === "autonomous",
         });
 
+      posthog.capture("onboarding_completed", {
+        company_name: data.companyName,
+        industry: data.industry,
+        autonomy_level: data.autonomyLevel,
+        platforms: data.platforms,
+        platform_count: data.platforms.length,
+        has_competitors: data.competitors.length > 0,
+      });
+
       setIsComplete(true);
       setMessages(prev => [...prev, {
         id: "complete",
@@ -337,6 +347,7 @@ export default function OnboardPage() {
 
     } catch (error) {
       console.error("Onboarding error:", error);
+      posthog.captureException(error, { tags: { context: "onboarding" } });
       setMessages(prev => [...prev, {
         id: "error",
         role: "ai",

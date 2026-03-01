@@ -9,6 +9,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { createCustomer, createCheckoutSession, getPriceForPlanAndCurrency } from "@/lib/billing/stripe";
 import { detectCurrency } from "@/lib/billing/currency";
+import { getPostHogClient } from "@/lib/posthog-server";
 
 export async function POST(request: Request) {
   try {
@@ -104,7 +105,22 @@ export async function POST(request: Request) {
       },
     });
 
-    return NextResponse.json({ 
+    const posthog = getPostHogClient();
+    posthog.capture({
+      distinctId: organizationId,
+      event: "checkout_session_created",
+      properties: {
+        plan_id: planId,
+        plan_name: plan.name,
+        currency: detectedCurrency,
+        trial_days: plan.trialDays,
+        organization_id: organizationId,
+        stripe_session_id: session.id,
+      },
+    });
+    await posthog.shutdown();
+
+    return NextResponse.json({
       url: session.url,
       sessionId: session.id,
     });
