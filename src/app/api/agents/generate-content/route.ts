@@ -99,19 +99,21 @@ export async function POST(request: NextRequest) {
     }
 
     const posthog = getPostHogClient();
-    posthog.capture({
-      distinctId: user.id,
-      event: "content_generated",
-      properties: {
-        platform,
-        content_type: (result.data as any)?.contentType,
-        confidence_score: result.confidenceScore,
-        needs_review: result.confidenceScore < 0.75,
-        status: savedContent?.status,
-        organization_id: organizationId,
-      },
-    });
-    await posthog.shutdown();
+    if (posthog) {
+      posthog.capture({
+        distinctId: user.id,
+        event: "content_generated",
+        properties: {
+          platform,
+          content_type: (result.data as any)?.contentType,
+          confidence_score: result.confidenceScore,
+          needs_review: result.confidenceScore < 0.75,
+          status: savedContent?.status,
+          organization_id: organizationId,
+        },
+      });
+      await posthog.shutdown();
+    }
 
     return NextResponse.json({
       success: true,

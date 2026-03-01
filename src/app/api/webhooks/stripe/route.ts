@@ -218,18 +218,20 @@ async function handleSubscriptionCreated(sub: any) {
   });
 
   const posthog = getPostHogClient();
-  posthog.capture({
-    distinctId: organizationId,
-    event: "subscription_activated",
-    properties: {
-      organization_id: organizationId,
-      plan_name: planPrice.billingPlan.name,
-      plan_slug: planPrice.billingPlan.slug,
-      status: sub.status,
-      stripe_subscription_id: sub.id,
-    },
-  });
-  await posthog.shutdown();
+  if (posthog) {
+    posthog.capture({
+      distinctId: organizationId,
+      event: "subscription_activated",
+      properties: {
+        organization_id: organizationId,
+        plan_name: planPrice.billingPlan.name,
+        plan_slug: planPrice.billingPlan.slug,
+        status: sub.status,
+        stripe_subscription_id: sub.id,
+      },
+    });
+    await posthog.shutdown();
+  }
 
   console.log(`Subscription created for org ${organizationId}: ${planPrice.billingPlan.name}`);
 }
@@ -322,16 +324,18 @@ async function handleSubscriptionCanceled(sub: any) {
   });
 
   const posthogCancel = getPostHogClient();
-  posthogCancel.capture({
-    distinctId: organizationId,
-    event: "subscription_canceled",
-    properties: {
-      organization_id: organizationId,
-      cancellation_reason: sub.metadata?.cancellation_reason ?? null,
-      stripe_subscription_id: sub.id,
-    },
-  });
-  await posthogCancel.shutdown();
+  if (posthogCancel) {
+    posthogCancel.capture({
+      distinctId: organizationId,
+      event: "subscription_canceled",
+      properties: {
+        organization_id: organizationId,
+        cancellation_reason: sub.metadata?.cancellation_reason ?? null,
+        stripe_subscription_id: sub.id,
+      },
+    });
+    await posthogCancel.shutdown();
+  }
 
   console.log(`Subscription canceled for org ${organizationId}`);
 }
@@ -436,17 +440,19 @@ async function handlePaymentFailed(invoice: any) {
   });
 
   const posthogPayment = getPostHogClient();
-  posthogPayment.capture({
-    distinctId: subscription.organizationId,
-    event: "payment_failed",
-    properties: {
-      organization_id: subscription.organizationId,
-      fail_count: newFailCount,
-      dunning_step: dunningStep,
-      stripe_customer_id: customerId,
-    },
-  });
-  await posthogPayment.shutdown();
+  if (posthogPayment) {
+    posthogPayment.capture({
+      distinctId: subscription.organizationId,
+      event: "payment_failed",
+      properties: {
+        organization_id: subscription.organizationId,
+        fail_count: newFailCount,
+        dunning_step: dunningStep,
+        stripe_customer_id: customerId,
+      },
+    });
+    await posthogPayment.shutdown();
+  }
 
   console.log(`Payment failed for org ${subscription.organizationId}: attempt ${newFailCount}`);
 }

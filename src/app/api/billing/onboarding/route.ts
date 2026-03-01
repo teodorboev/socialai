@@ -106,19 +106,21 @@ export async function POST(request: Request) {
     });
 
     const posthog = getPostHogClient();
-    posthog.capture({
-      distinctId: organizationId,
-      event: "checkout_session_created",
-      properties: {
-        plan_id: planId,
-        plan_name: plan.name,
-        currency: detectedCurrency,
-        trial_days: plan.trialDays,
-        organization_id: organizationId,
-        stripe_session_id: session.id,
-      },
-    });
-    await posthog.shutdown();
+    if (posthog) {
+      posthog.capture({
+        distinctId: organizationId,
+        event: "checkout_session_created",
+        properties: {
+          plan_id: planId,
+          plan_name: plan.name,
+          currency: detectedCurrency,
+          trial_days: plan.trialDays,
+          organization_id: organizationId,
+          stripe_session_id: session.id,
+        },
+      });
+      await posthog.shutdown();
+    }
 
     return NextResponse.json({
       url: session.url,
